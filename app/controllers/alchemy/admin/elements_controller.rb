@@ -26,6 +26,10 @@ module Alchemy
         @page = Page.find_by_id(params[:page_id])
         @element = @page.elements.build
         @elements = @page.available_element_definitions
+        @elements.delete_if{ |element|
+            !element["user_roles"].blank? && current_user.role != element["user_roles"]
+        }
+
         @clipboard = get_clipboard('elements')
         @clipboard_items = Element.all_from_clipboard_for_page(@clipboard, @page)
       end

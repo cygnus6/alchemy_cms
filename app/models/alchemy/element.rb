@@ -23,7 +23,7 @@ module Alchemy
     include Alchemy::Touching
     include Alchemy::Hints
 
-    FORBIDDEN_DEFINITION_ATTRIBUTES = %w(contents available_contents amount picture_gallery taggable hint)
+    FORBIDDEN_DEFINITION_ATTRIBUTES = %w(contents available_contents amount picture_gallery taggable hint user_roles)
     SKIPPED_ATTRIBUTES_ON_COPY = %w(id position folded created_at updated_at creator_id updater_id cached_tag_list)
 
     acts_as_taggable
