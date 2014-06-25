@@ -31,9 +31,6 @@ module Alchemy
         # Setting the locale to pages language, so the page content has it's correct translations.
         ::I18n.locale = @page.language_code
         render layout: 'application'
-      rescue Exception => e
-        exception_logger(e)
-        render file: Rails.root.join('public', '500.html'), status: 500, layout: false
       end
 
       def info
@@ -43,7 +40,8 @@ module Alchemy
       def new
         @page = Page.new(layoutpage: params[:layoutpage] == 'true', parent_id: params[:parent_id])
         @page_layouts = PageLayout.layouts_for_select(Language.current.id, @page.layoutpage?)
-        @clipboard_items = Page.all_from_clipboard_for_select(get_clipboard[:pages], Language.current.id, @page.layoutpage?)
+        @clipboard = get_clipboard('pages')
+        @clipboard_items = Page.all_from_clipboard_for_select(@clipboard, Language.current.id, @page.layoutpage?)
       end
 
       def create
@@ -53,7 +51,8 @@ module Alchemy
           do_redirect_to(redirect_path_after_create_page)
         else
           @page_layouts = PageLayout.layouts_for_select(Language.current.id, @page.layoutpage?)
-          @clipboard_items = Page.all_from_clipboard_for_select(get_clipboard[:pages], Language.current.id, @page.layoutpage?)
+          @clipboard = get_clipboard('pages')
+          @clipboard_items = Page.all_from_clipboard_for_select(@clipboard, Language.current.id, @page.layoutpage?)
           render :new
         end
       end
@@ -62,7 +61,7 @@ module Alchemy
       def edit
         # fetching page via before filter
         if page_is_locked?
-          flash[:notice] = _t("This page is locked by %{name}", name: @page.locker_name)
+          flash[:notice] = _t('This page is locked', name: @page.locker_name)
           redirect_to admin_pages_path
         else
           @page.lock_to!(current_alchemy_user)
@@ -105,7 +104,8 @@ module Alchemy
             format.js
           end
           # remove from clipboard
-          get_clipboard.remove(:pages, @page_id)
+          @clipboard = get_clipboard('pages')
+          @clipboard.delete_if { |item| item['id'] == @page_id.to_s }
         end
       end
 
@@ -173,15 +173,17 @@ module Alchemy
         @sorting = true
       end
 
+      # Receives a JSON object representing a language tree to be ordered
+      # and updates all pages in that language structure to their correct indexes
       def order
-        # Taken from https://github.com/matenia/jQuery-Awesome-Nested-Set-Drag-and-Drop
         neworder = JSON.parse(params[:set])
-        prev_item = nil
-        neworder.each do |item|
-          dbitem = Page.find(item['id'])
-          prev_item.nil? ? dbitem.move_to_child_of(@page_root) : dbitem.move_to_right_of(prev_item)
-          sort_children(item, dbitem) unless item['children'].nil?
-          prev_item = dbitem.reload
+        tree = create_tree(neworder, @page_root)
+
+        Alchemy::Page.transaction do
+          tree.each do |key, node|
+            dbitem = Page.find(key)
+            dbitem.update_node!(node)
+          end
         end
 
         flash[:notice] = _t("Pages order saved")
@@ -218,23 +220,91 @@ module Alchemy
         Page.language_root_for(params[:languages][:old_lang_id])
       end
 
+      # Returns the current left index and the aggregated hash of tree nodes indexed by page id visited so far
+      #
+      # Visits a batch of children nodes, assigns them the correct ordering indexes and spuns recursively the same
+      # procedure on their children, if any
+      #
+      # @param [Array]
+      #   An array of children nodes to be visited
+      # @param [Integer]
+      #   The lft attribute that should be given to the first node in the array
+      # @param [Integer]
+      #   The page id of the parent of this batch of children nodes
+      # @param [Integer]
+      #   The depth at which these children reside
+      # @param [Hash]
+      #   A Hash of TreeNode's indexed by their page ids
+      # @param [String]
+      #   The url for the parent node of these children
+      # @param [Boolean]
+      #   Whether these children reside in a restricted branch according to their ancestors
+      #
+      def visit_nodes(nodes, my_left, parent, depth, tree, url, restricted)
+        nodes.each do |item|
+          my_right = my_left + 1
+          my_restricted = item['restricted'] || restricted
+          urls = process_url(url, item)
+
+          if item['children']
+            my_right, tree = visit_nodes(item['children'], my_left + 1, item['id'], depth + 1, tree, urls[:children_path], my_restricted)
+          end
+
+          tree[item['id']] = TreeNode.new(my_left, my_right, parent, depth, urls[:my_urlname], my_restricted)
+          my_left = my_right + 1
+        end
+
+        [my_left, tree]
+      end
+
+      # Returns a Hash of TreeNode's indexed by their page ids
+      #
+      # Grabs the array representing a tree structure of pages passed as a parameter,
+      # visits it and creates a map of TreeNodes indexed by page id featuring Nested Set
+      # ordering information consisting of the left, right, depth and parent_id indexes as
+      # well as a node's url and restricted status
+      #
+      # @param [Array]
+      #   An Array representing a tree of Alchemy::Page's
+      # @param [Alchemy::Page]
+      #   The root page for the language being ordered
+      #
+      def create_tree(items, rootpage)
+        _, tree = visit_nodes(items, rootpage.lft + 1, rootpage.id, rootpage.depth + 1, {}, "", rootpage.restricted)
+        tree
+      end
+
+      # Returns a pair, the path that a given tree node should take, and the path its children should take
+      #
+      # This function will add a node's own slug into their ancestor's path
+      # in order to create the full URL of a node
+      #
+      # NOTE: external and invisible pages are not part of the full path of their children
+      #
+      # @param [String]
+      #   The node's ancestors path
+      # @param [Hash]
+      #   A children node
+      #
+      def process_url(ancestors_path, item)
+        default_urlname = (ancestors_path.blank? ? "" : "#{ancestors_path}/") + item['slug'].to_s
+
+        pair = {my_urlname: default_urlname, children_path: default_urlname}
+
+        if item['external'] == true || item['visible'] == false
+          # children ignore an ancestor in their path if external or invisible
+          pair[:children_path] = ancestors_path
+        end
+
+        pair
+      end
+
       def load_page
         @page = Page.find(params[:id])
       end
 
       def pages_from_raw_request
         request.raw_post.split('&').map { |i| i = {i.split('=')[0].gsub(/[^0-9]/, '') => i.split('=')[1]} }
-      end
-
-      # Taken from https://github.com/matenia/jQuery-Awesome-Nested-Set-Drag-and-Drop
-      def sort_children(element, dbitem)
-        prevchild = nil
-        element['children'].each do |child|
-          childitem = Page.find(child['id'])
-          prevchild.nil? ? childitem.move_to_child_of(dbitem) : childitem.move_to_right_of(prevchild)
-          sort_children(child, childitem) unless child['children'].nil?
-          prevchild = childitem
-        end
       end
 
       def redirect_path_for_switch_language

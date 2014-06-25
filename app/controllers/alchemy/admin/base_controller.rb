@@ -13,7 +13,7 @@ module Alchemy
       rescue_from Exception do |exception|
         if exception.is_a? CanCan::AccessDenied
           permission_denied(exception)
-        elsif Rails.env.test?
+        elsif raise_exception?
           raise
         else
           exception_handler(exception)
@@ -59,21 +59,15 @@ module Alchemy
         end
       end
 
-      def get_clipboard
-        session[:clipboard] ||= Clipboard.new
-      rescue NoMethodError => e
-        exception_logger(e)
-        @notice = "You have an old style clipboard in your session. Please remove your cookies and try again."
-        render :action => "error_notice", :layout => false
+      # Returns clipboard items for given category
+      def get_clipboard(category)
+        session[:alchemy_clipboard] ||= {}
+        session[:alchemy_clipboard][category.to_s] ||= []
       end
 
-      def clipboard_empty?(category = nil)
-        return true if session[:clipboard].blank?
-        if category
-          session[:clipboard][category.pluralize].blank?
-        else
-          false
-        end
+      # Checks if clipboard for given category is blank
+      def clipboard_empty?(category)
+        get_clipboard(category).blank?
       end
 
       def trash_empty?(category)
@@ -149,6 +143,19 @@ module Alchemy
         else
           {}
         end.symbolize_keys
+      end
+
+      # This method decides if we want to raise an exception or not.
+      #
+      # I.e. in test environment.
+      #
+      def raise_exception?
+        Rails.env.test? || is_page_preview?
+      end
+
+      # Are we currently in the page edit mode page preview.
+      def is_page_preview?
+        controller_path == 'alchemy/admin/pages' && action_name == 'show'
       end
 
     end

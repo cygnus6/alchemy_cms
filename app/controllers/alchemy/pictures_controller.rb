@@ -45,68 +45,69 @@ module Alchemy
       return false
     end
 
-    def send_image(image_file, format)
+    def send_image(image, format)
       ALLOWED_IMAGE_TYPES.each do |type|
         format.send(type) do
           if type == 'jpeg'
             quality = params[:quality] || Config.get(:output_image_jpg_quality)
-            image_file = image_file.encode(type, "-quality #{quality}")
+            image = image.encode(type, "-quality #{quality}")
           else
-            image_file = image_file.encode(type)
+            image = image.encode(type)
           end
-          render text: image_file.data
+          render text: image.data
         end
       end
     end
 
     # Return the processed image dependent of size and cropping parameters
     def processed_image
-      image_file = @picture.image_file
-      if image_file.nil?
+      @image = @picture.image_file
+      if @image.nil?
         raise MissingImageFileError, "Missing image file for #{@picture.inspect}"
       end
-      if params[:crop_size].present? && params[:crop_from].present?
-        image_file = image_file.thumb crop_geometry_string(params)
-        image_file.thumb(resize_geometry_string)
-      elsif params[:crop] == 'crop' && @size.present?
-        width, height = normalize_sizes(image_file)
-        image_file.thumb("#{width}x#{height}#")
-      elsif @size.present?
-        image_file.thumb(resize_geometry_string)
+      if @size.present?
+        if params[:crop_size].present? && params[:crop_from].present?
+          @image = @image.thumb xy_crop_geometry_string(params)
+          @image.thumb(resize_geometry_string)
+        elsif params[:crop]
+          @image.thumb(center_crop_geometry_string)
+        else
+          @image.thumb(resize_geometry_string)
+        end
       else
-        image_file
+        @image
       end
     end
 
     # Returns the Imagemagick geometry string for cropping the image.
-    def crop_geometry_string(params)
+    def xy_crop_geometry_string(params)
       crop_from_x, crop_from_y = params[:crop_from].split('x')
       "#{params[:crop_size]}+#{crop_from_x}+#{crop_from_y}"
     end
 
     # Returns the Imagemagick geometry string used to resize the image.
+    #
+    # Prevents upscaling unless :upsample param is true.
     def resize_geometry_string
-      @resize_geometry_string ||= begin
-        params[:upsample] == 'true' ? @size.to_s : "#{@size}>"
-      end
+      params[:upsample] == 'true' ? @size : "#{@size}>"
     end
 
-    # Returns normalized width and height values
+    # Returns the Imagemagick geometry string used to crop the image.
     #
-    # Prevents upscaling unless :upsample param is true,
-    # because unfurtunally Dragonfly does not handle this correctly while cropping
-    #
-    def normalize_sizes(image_file)
-      width, height = @size.split('x').collect(&:to_i)
-      return width, height if params[:upsample] == 'true'
-      if width > image_file.width
-        width = image_file.width
-      end
-      if height > image_file.height
-        height = image_file.height
-      end
-      return width, height
+    # Prevents upscaling unless :upsample param is true
+    def center_crop_geometry_string
+      params[:upsample] == 'true' ? "#{@size}#" : "#{normalized_sizes(*@size.split('x'))}#"
     end
 
+    # Ensure we're not trying to scale the image up. Used only for cropping.
+    def normalized_sizes(width, height)
+      if width.to_i > @image.width
+        width = @image.width
+      end
+      if height.to_i > @image.height
+        height = @image.height
+      end
+      "#{width}x#{height}"
+    end
   end
 end

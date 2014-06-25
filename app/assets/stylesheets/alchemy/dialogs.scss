@@ -1,5 +1,6 @@
 .alchemy-dialog-container {
-  position: absolute;
+  position: fixed;
+  overflow: auto;
   top: 0;
   left: 0;
   z-index: 100;
@@ -29,10 +30,15 @@
   position: fixed;
   top: 0;
   left: 0;
-  z-index: 0;
+  z-index: 30;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.4);
+  background-color: rgba(0, 0, 0, 0.0);
+  @include transition(background-color 200ms linear);
+
+  &.open {
+    background-color: rgba(0, 0, 0, 0.4);
+  }
 
   &.closable {
     cursor: pointer;
@@ -153,8 +159,16 @@
   position: relative;
   color: $text-color;
 
+  .message {
+    margin: 8px;
+  }
+
   &.padded {
     padding: 4*$default-padding;
+
+    .message {
+      margin: 0 0 8px 0;
+    }
   }
 
   ul#sitemap ul li span.sitemap_sitename {

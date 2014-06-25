@@ -33,27 +33,14 @@ require 'alchemy/test_support/controller_requests'
 require 'alchemy/test_support/integration_helpers'
 require 'alchemy/test_support/factories'
 require 'alchemy/test_support/essence_shared_examples'
-require_relative "support/test_tweaks.rb"
 require_relative "support/hint_examples.rb"
-
-# Temporay fix for mavericks phantomjs bug
-if RUBY_PLATFORM =~ /darwin/
-  require_relative "support/phantomjs_mavericks_fix.rb"
-  Capybara.register_driver :poltergeist do |app|
-    Capybara::Poltergeist::Driver.new(app, {
-      phantomjs_logger: Alchemy::WarningSuppressor,
-      js_errors: false
-    })
-  end
-else
-  Capybara.register_driver :poltergeist do |app|
-    Capybara::Poltergeist::Driver.new(app, js_errors: false)
-  end
-end
 
 # Configure capybara for integration testing
 Capybara.default_driver = :rack_test
 Capybara.default_selector = :css
+Capybara.register_driver :poltergeist do |app|
+  Capybara::Poltergeist::Driver.new(app, js_errors: false)
+end
 Capybara.register_driver(:rack_test_translated_header) do |app|
   Capybara::RackTest::Driver.new(app, headers: { 'HTTP_ACCEPT_LANGUAGE' => 'de' })
 end
@@ -70,15 +57,32 @@ RSpec.configure do |config|
   config.include Alchemy::TestSupport::IntegrationHelpers, type: :feature
   config.include FactoryGirl::Syntax::Methods
 
-  config.use_transactional_fixtures = true
+  config.use_transactional_fixtures = false
   # Make sure the database is clean and ready for test
   config.before(:suite) do
-    truncate_all_tables
+    DatabaseCleaner.clean_with(:truncation)
     Alchemy::Seeder.seed!
   end
-  # Ensuring that the locale is always resetted to :en before running any tests
+
+  # All specs are running in transactions, but feature specs not.
   config.before(:each) do
     Alchemy::Site.current = nil
     ::I18n.locale = :en
+    if example.metadata[:type] == :feature
+      DatabaseCleaner.strategy = :truncation
+    else
+      DatabaseCleaner.strategy = :transaction
+    end
+    DatabaseCleaner.start
+  end
+
+  # After each spec the database gets cleaned. (via rollback or truncate for feature specs)
+  # After every feature spec the database gets seeded so the next spec can rely on that data.
+  config.append_after(:each) do
+    DatabaseCleaner.clean
+    if example.metadata[:type] == :feature
+      Alchemy::Seeder.stub(:puts)
+      Alchemy::Seeder.seed!
+    end
   end
 end

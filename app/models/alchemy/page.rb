@@ -30,6 +30,7 @@
 #  updater_id       :integer
 #  language_id      :integer
 #  cached_tag_list  :text
+#  published_at     :datetime
 #
 
 module Alchemy
@@ -69,10 +70,8 @@ module Alchemy
     stampable stamper_class_name: Alchemy.user_class_name
 
     has_many :folded_pages
-
     has_many :legacy_urls, :class_name => 'Alchemy::LegacyPageUrl'
     belongs_to :language
-    belongs_to :locker, class_name: Alchemy.user_class_name, foreign_key: 'locked_by'
 
     validates_presence_of :language, :on => :create, :unless => :root
     validates_presence_of :page_layout, :unless => :systempage?
@@ -89,12 +88,12 @@ module Alchemy
     after_update :create_legacy_url, if: :urlname_changed?, unless: :redirects_to_external?
 
     # Concerns
-    include Alchemy::Page::Scopes
-    include Alchemy::Page::Natures
-    include Alchemy::Page::Naming
-    include Alchemy::Page::Users
-    include Alchemy::Page::Cells
-    include Alchemy::Page::Elements
+    include Alchemy::Page::PageScopes
+    include Alchemy::Page::PageNatures
+    include Alchemy::Page::PageNaming
+    include Alchemy::Page::PageUsers
+    include Alchemy::Page::PageCells
+    include Alchemy::Page::PageElements
 
     # Class methods
     #
@@ -178,7 +177,7 @@ module Alchemy
 
       def all_from_clipboard(clipboard)
         return [] if clipboard.blank?
-        where(id: clipboard.collect { |p| p[:id] })
+        where(id: clipboard.collect { |p| p['id'] })
       end
 
       def all_from_clipboard_for_select(clipboard, language_id, layoutpage = false)
@@ -251,7 +250,7 @@ module Alchemy
     # Page layout partials live in +app/views/alchemy/page_layouts+
     #
     def to_partial_path
-      "alchemy/page_layouts/#{page_layout}"
+      "alchemy/page_layouts/#{layout_partial_name}"
     end
 
     # Returns the previous page on the same level or nil.
@@ -334,6 +333,25 @@ module Alchemy
       update_columns(published_at: Time.now, public: true)
     end
 
+    # Updates an Alchemy::Page based on a new ordering to be applied to it
+    #
+    # Note: Page's urls should not be updated (and a legacy URL created) if nesting is OFF
+    # or if a page is external or if the URL is the same
+    #
+    # @param [TreeNode]
+    #   A tree node with new lft, rgt, depth, url, parent_id and restricted indexes to be updated
+    #
+    def update_node!(node)
+      hash = {lft: node.left, rgt: node.right, parent_id: node.parent, depth: node.depth, restricted: node.restricted}
+
+      if Config.get(:url_nesting) && !self.redirects_to_external? && self.urlname != node.url
+        LegacyPageUrl.create(page_id: self.id, urlname: self.urlname)
+        hash.merge!(urlname: node.url)
+      end
+
+      update_columns(hash)
+    end
+
     private
 
     # Returns the next or previous page on the same level or nil.
@@ -356,7 +374,7 @@ module Alchemy
         .where(["#{self.class.table_name}.lft #{dir} ?", lft])
         .where(public: options[:public])
         .where(restricted: options[:restricted])
-        .order(dir == '>' ? 'lft' : 'lft DESC')
+        .reorder(dir == '>' ? 'lft' : 'lft DESC')
         .limit(1).first
     end
 

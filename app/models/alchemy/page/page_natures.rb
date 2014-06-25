@@ -1,5 +1,5 @@
 module Alchemy
-  module Page::Natures
+  module Page::PageNatures
 
     extend ActiveSupport::Concern
 
@@ -27,7 +27,7 @@ module Alchemy
 
     # Returns true or false if the pages layout_description for config/alchemy/page_layouts.yml contains redirects_to_external: true
     def redirects_to_external?
-      definition["redirects_to_external"]
+      !!definition["redirects_to_external"]
     end
 
     def has_controller?
@@ -81,6 +81,12 @@ module Alchemy
       I18n.t(self.page_layout, :scope => :page_layout_names)
     end
 
+    # Returns the name for the layout partial
+    #
+    def layout_partial_name
+      page_layout.parameterize.underscore
+    end
+
     # Returns the key that's taken for cache path.
     #
     # Uses the +published_at+ value that's updated when the user publishes the page.
@@ -93,6 +99,15 @@ module Alchemy
       else
         "alchemy/pages/#{id}-#{published_at}"
       end
+    end
+
+    # We use the published_at value for the cache_key.
+    #
+    # If no published_at value is set yet, i.e. because it was never published,
+    # we return the updated_at value.
+    #
+    def published_at
+      read_attribute(:published_at) || updated_at
     end
 
   end

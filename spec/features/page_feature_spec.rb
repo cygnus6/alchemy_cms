@@ -77,7 +77,7 @@ module Alchemy
         context "requested url is only the urlname" do
           it "then it should redirect to pages url with nested language." do
             visit '/home'
-            page.current_path.should == '/de/home'
+            page.current_path.should == '/en/home'
           end
         end
 
@@ -90,8 +90,8 @@ module Alchemy
           before { Alchemy.user_class.stub(:admins).and_return([1, 2]) }
 
           it "should render 404 if urlname and lang parameter do not belong to same page" do
-            FactoryGirl.create(:english)
-            visit "/en/#{public_page_1.urlname}"
+            FactoryGirl.create(:klingonian)
+            visit "/kl/#{public_page_1.urlname}"
             page.status_code.should == 404
           end
 
@@ -111,7 +111,7 @@ module Alchemy
         end
 
         it "should redirect from nested language code url to normal url" do
-          visit "/de/#{public_page_1.urlname}"
+          visit "/en/#{public_page_1.urlname}"
           page.current_path.should == "/#{public_page_1.urlname}"
         end
 
@@ -127,7 +127,7 @@ module Alchemy
           end
 
           it "with normal url, if requested url has nested language code and is not public" do
-            visit '/de/not-public'
+            visit '/en/not-public'
             page.current_path.should == '/public-child'
           end
         end
@@ -179,7 +179,7 @@ module Alchemy
 
       context "rendering for authors" do
         it "is allowed" do
-          authorize_as_admin(mock_model('DummyUser', alchemy_roles: %w(author), language: 'en'))
+          authorize_as_admin(mock_model('DummyUser', alchemy_roles: %w(author), language: 'en', cache_key: 'aaa'))
           visit "/#{public_page_1.urlname}"
           within('body') { page.should have_selector('#alchemy_menubar') }
         end
@@ -187,7 +187,7 @@ module Alchemy
 
       context "rendering for editors" do
         it "is allowed" do
-          authorize_as_admin(mock_model('DummyUser', alchemy_roles: %w(editor), language: 'en'))
+          authorize_as_admin(mock_model('DummyUser', alchemy_roles: %w(editor), language: 'en', cache_key: 'aaa'))
           visit "/#{public_page_1.urlname}"
           within('body') { page.should have_selector('#alchemy_menubar') }
         end
@@ -195,7 +195,7 @@ module Alchemy
 
       context "rendering for admins" do
         it "is allowed" do
-          authorize_as_admin
+          authorize_as_admin(mock_model('DummyUser', alchemy_roles: %w(admin), language: 'en', cache_key: 'aaa'))
           visit "/#{public_page_1.urlname}"
           within('body') { page.should have_selector('#alchemy_menubar') }
         end
@@ -203,7 +203,7 @@ module Alchemy
 
       context "contains" do
         before do
-          authorize_as_admin
+          authorize_as_admin(mock_model('DummyUser', alchemy_roles: %w(admin), language: 'en', cache_key: 'aaa'))
           visit "/#{public_page_1.urlname}"
         end
 
@@ -217,6 +217,19 @@ module Alchemy
 
         it "a form and button to logout of alchemy" do
           within('#alchemy_menubar') { page.should have_selector("li form[action='#{Alchemy.logout_path}'], li button[type='submit']") }
+        end
+      end
+    end
+
+    describe 'navigation rendering' do
+      context 'with page having an external url without protocol' do
+        let!(:external_page) { create(:page, urlname: 'google.com', page_layout: 'external', visible: true) }
+
+        it "adds an prefix to url" do
+          visit "/#{public_page_1.urlname}"
+          within '#navigation' do
+            expect(page.body).to match('http://google.com')
+          end
         end
       end
     end

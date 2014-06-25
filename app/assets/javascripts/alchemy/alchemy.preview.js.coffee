@@ -1,6 +1,6 @@
+#= require alchemy/alchemy.jquery_loader
 #= require alchemy/alchemy.browser
 #= require alchemy/alchemy.i18n
-#= require alchemy/alchemy.jquery_loader
 
 window.Alchemy = {} if typeof(Alchemy) is 'undefined'
 
@@ -25,6 +25,7 @@ Alchemy.initAlchemyPreviewMode = ($) ->
         default_hover:
           outline: "3px solid #F0B437"
           "outline-offset": "4px"
+          cursor: "pointer"
 
         webkit_hover:
           outline: "4px auto #F0B437"

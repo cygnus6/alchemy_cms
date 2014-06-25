@@ -33,13 +33,13 @@ module Alchemy
 
         it "should validate the page_layout" do
           contentpage.page_layout = nil
-          contentpage.save
+          contentpage.should_not be_valid
           contentpage.should have(1).error_on(:page_layout)
         end
 
         it "should validate the parent_id" do
           contentpage.parent_id = nil
-          contentpage.save
+          contentpage.should_not be_valid
           contentpage.should have(1).error_on(:parent_id)
         end
 
@@ -74,25 +74,52 @@ module Alchemy
       end
 
       context "creating the rootpage without parent_id and page_layout" do
+        let(:rootpage) { build(:page, parent_id: nil, page_layout: nil, name: 'Rootpage') }
+
         before do
           Page.delete_all
-          @rootpage = FactoryGirl.build(:page, :parent_id => nil, :page_layout => nil, :name => 'Rootpage')
         end
 
         it "should be valid" do
-          @rootpage.save
-          @rootpage.should be_valid
+          rootpage.should be_valid
         end
       end
 
       context "saving a systempage" do
-        before do
-          @systempage = FactoryGirl.build(:systempage)
-        end
+        let(:systempage) { build(:systempage) }
 
         it "should not validate the page_layout" do
-          @systempage.save
-          @systempage.should be_valid
+          systempage.should be_valid
+        end
+      end
+
+      context 'saving an external page' do
+        let(:external_page) { build(:page, page_layout: 'external') }
+
+        it "does not pass with invalid url given" do
+          external_page.urlname = 'not, a valid page url'
+          expect(external_page).to_not be_valid
+        end
+
+        it "only be valid with correct url given" do
+          external_page.urlname = 'www.google.com&utf_src=alchemy;page_id=%20'
+          expect(external_page).to be_valid
+        end
+
+        context 'on create' do
+          it "is valid without urlname given" do
+            external_page.urlname = ''
+            expect(external_page).to be_valid
+          end
+        end
+
+        context 'on update' do
+          before { external_page.save! }
+
+          it "is not valid without urlname given" do
+            external_page.urlname = ''
+            expect(external_page).to_not be_valid
+          end
         end
       end
     end
@@ -151,6 +178,27 @@ module Alchemy
             page.urlname = 'my-testpage'
             page.save!
             page.legacy_urls.should be_empty
+          end
+        end
+      end
+
+      context 'after_move' do
+        let(:parent_1) { FactoryGirl.create(:page, name: 'Parent 1', visible: true) }
+        let(:parent_2) { FactoryGirl.create(:page, name: 'Parent 2', visible: true) }
+        let(:page)     { FactoryGirl.create(:page, parent_id: parent_1.id, name: 'Page', visible: true) }
+
+        it "updates the urlname" do
+          page.urlname.should == 'parent-1/page'
+          page.move_to_child_of parent_2
+          page.urlname.should == 'parent-2/page'
+        end
+
+        context 'of an external page' do
+          let(:external) { FactoryGirl.create(:page, parent_id: parent_1.id, name: 'external', page_layout: 'external', urlname: 'http://google.com') }
+
+          it "the urlname does not get updated" do
+            external.move_to_child_of parent_2
+            external.urlname.should == 'http://google.com'
           end
         end
       end
@@ -276,8 +324,8 @@ module Alchemy
           page_1 = FactoryGirl.create(:page, :language => language)
           page_2 = FactoryGirl.create(:page, :language => language, :name => 'Another page')
           clipboard = [
-            {:id => page_1.id, :action => "copy"},
-            {:id => page_2.id, :action => "copy"}
+            {'id' => page_1.id.to_s, 'action' => 'copy'},
+            {'id' => page_2.id.to_s, 'action' => 'copy'}
           ]
           Page.all_from_clipboard_for_select(clipboard, language.id).should include(page_1, page_2)
         end
@@ -287,7 +335,7 @@ module Alchemy
         it "should not return any pages" do
           page_1 = FactoryGirl.create(:page, :language => language, :page_layout => 'contact')
           clipboard = [
-            {:id => page_1.id, :action => "copy"}
+            {'id' => page_1.id.to_s, 'action' => 'copy'}
           ]
           Page.all_from_clipboard_for_select(clipboard, language.id).should == []
         end
@@ -298,8 +346,8 @@ module Alchemy
           page_1 = FactoryGirl.create(:page, :language => language, :page_layout => 'standard')
           page_2 = FactoryGirl.create(:page, :name => 'Another page', :language => language, :page_layout => 'contact')
           clipboard = [
-            {:id => page_1.id, :action => "copy"},
-            {:id => page_2.id, :action => "copy"}
+            {'id' => page_1.id.to_s, 'action' => 'copy'},
+            {'id' => page_2.id.to_s, 'action' => 'copy'}
           ]
           Page.all_from_clipboard_for_select(clipboard, language.id).should == [page_1]
         end
@@ -998,6 +1046,7 @@ module Alchemy
       describe '#previous' do
         it "should return the previous page on the same level" do
           center_page.previous.should == public_page
+          next_page.previous.should == center_page
         end
 
         context "no previous page on same level present" do
@@ -1159,6 +1208,7 @@ module Alchemy
       let(:page)         { FactoryGirl.create(:page, parent_id: parent.id, name: 'page', visible: true) }
       let(:invisible)    { FactoryGirl.create(:page, parent_id: page.id, name: 'invisible', visible: false) }
       let(:contact)      { FactoryGirl.create(:page, parent_id: invisible.id, name: 'contact', visible: true) }
+      let(:external)     { FactoryGirl.create(:page, parent_id: parent.id, name: 'external', page_layout: 'external', urlname: 'http://google.com') }
 
       context "with activated url_nesting" do
         before { Config.stub(:get).and_return(true) }
@@ -1179,13 +1229,23 @@ module Alchemy
           contact.urlname.should_not =~ /invisible/
         end
 
-        context "after changing my urlname" do
-          it "should update urlnames of descendants" do
+        context "after changing page's urlname" do
+          it "updates urlnames of descendants" do
             page
             parentparent.urlname = 'new-urlname'
             parentparent.save!
             page.reload
             page.urlname.should == 'new-urlname/parent/page'
+          end
+
+          context 'with descendants that are redirecting to external' do
+            it "it skips this page" do
+              external
+              parent.urlname = 'new-urlname'
+              parent.save!
+              external.reload
+              external.urlname.should == 'http://google.com'
+            end
           end
 
           it "should create a legacy url" do
@@ -1216,6 +1276,124 @@ module Alchemy
       end
     end
 
+    describe "#update_node!" do
+
+      let(:original_url) { "sample-url" }
+      let(:page) { FactoryGirl.create(:page, :language => language, :parent_id => language_root.id, :urlname => original_url, restricted: false) }
+      let(:node) { TreeNode.new(10, 11, 12, 13, "another-url", true) }
+
+      context "when nesting is enabled" do
+        before { Alchemy::Config.stub(:get).with(:url_nesting) { true } }
+
+        context "when page is not external" do
+
+          before { page.stub(redirects_to_external?: false)}
+
+          it "should update all attributes" do
+            page.update_node!(node)
+            page.reload
+            expect(page.lft).to eq(node.left)
+            expect(page.rgt).to eq(node.right)
+            expect(page.parent_id).to eq(node.parent)
+            expect(page.depth).to eq(node.depth)
+            expect(page.urlname).to eq(node.url)
+            expect(page.restricted).to eq(node.restricted)
+          end
+
+          context "when url is the same" do
+            let(:node) { TreeNode.new(10, 11, 12, 13, original_url, true) }
+
+            it "should not create a legacy url" do
+              page.update_node!(node)
+              page.reload
+              expect(page.legacy_urls.size).to eq(0)
+            end
+          end
+
+          context "when url is not the same" do
+            it "should create a legacy url" do
+              page.update_node!(node)
+              page.reload
+              expect(page.legacy_urls.size).to eq(1)
+            end
+          end
+        end
+
+        context "when page is external" do
+
+          before { page.stub(redirects_to_external?: true) }
+
+          it "should update all attributes except url" do
+            page.update_node!(node)
+            page.reload
+            expect(page.lft).to eq(node.left)
+            expect(page.rgt).to eq(node.right)
+            expect(page.parent_id).to eq(node.parent)
+            expect(page.depth).to eq(node.depth)
+            expect(page.urlname).to eq(original_url)
+            expect(page.restricted).to eq(node.restricted)
+          end
+
+          it "should not create a legacy url" do
+            page.update_node!(node)
+            page.reload
+            expect(page.legacy_urls.size).to eq(0)
+          end
+        end
+      end
+
+      context "when nesting is disabled" do
+        before { Alchemy::Config.stub(:get).with(:url_nesting) { false } }
+
+        context "when page is not external" do
+
+          before { page.stub(redirects_to_external?: false)}
+
+          it "should update all attributes except url" do
+            page.update_node!(node)
+            page.reload
+            expect(page.lft).to eq(node.left)
+            expect(page.rgt).to eq(node.right)
+            expect(page.parent_id).to eq(node.parent)
+            expect(page.depth).to eq(node.depth)
+            expect(page.urlname).to eq(original_url)
+            expect(page.restricted).to eq(node.restricted)
+          end
+
+          it "should not create a legacy url" do
+            page.update_node!(node)
+            page.reload
+            expect(page.legacy_urls.size).to eq(0)
+          end
+
+        end
+
+        context "when page is external" do
+
+          before { page.stub(redirects_to_external?: true) }
+
+          before { Alchemy::Config.stub(get: true) }
+
+          it "should update all attributes except url" do
+            page.update_node!(node)
+            page.reload
+            expect(page.lft).to eq(node.left)
+            expect(page.rgt).to eq(node.right)
+            expect(page.parent_id).to eq(node.parent)
+            expect(page.depth).to eq(node.depth)
+            expect(page.urlname).to eq(original_url)
+            expect(page.restricted).to eq(node.restricted)
+          end
+
+          it "should not create a legacy url" do
+            page.update_node!(node)
+            page.reload
+            expect(page.legacy_urls.size).to eq(0)
+          end
+        end
+      end
+    end
+
     describe '#slug' do
       context "with parents path saved in urlname" do
         let(:page) { FactoryGirl.build(:page, urlname: 'root/parent/my-name')}
@@ -1238,6 +1416,34 @@ module Alchemy
 
         it "should return nil" do
           page.slug.should be_nil
+        end
+      end
+    end
+
+    describe '#external_urlname' do
+      let(:external_page) { build(:page, page_layout: 'external') }
+
+      context 'with missing protocol' do
+        before { external_page.urlname = 'google.com'}
+
+        it "returns an urlname prefixed with http://" do
+          expect(external_page.external_urlname).to eq 'http://google.com'
+        end
+      end
+
+      context 'with protocol present' do
+        before { external_page.urlname = 'ftp://google.com'}
+
+        it "returns the urlname" do
+          expect(external_page.external_urlname).to eq 'ftp://google.com'
+        end
+      end
+
+      context 'beginngin with a slash' do
+        before { external_page.urlname = '/internal-url'}
+
+        it "returns the urlname" do
+          expect(external_page.external_urlname).to eq '/internal-url'
         end
       end
     end
@@ -1272,6 +1478,41 @@ module Alchemy
 
     context 'indicate page editors' do
       let(:page) { Page.new }
+      let(:user) { create(:editor_user) }
+
+      describe '#creator' do
+        before { page.update(creator_id: user.id) }
+
+        it "returns the user that created the page" do
+          expect(page.creator).to eq(user)
+        end
+      end
+
+      describe '#updater' do
+        before { page.update(updater_id: user.id) }
+
+        it "returns the user that created the page" do
+          expect(page.updater).to eq(user)
+        end
+      end
+
+      describe '#locker' do
+        before { page.update(locked_by: user.id) }
+
+        it "returns the user that created the page" do
+          expect(page.locker).to eq(user)
+        end
+      end
+
+      context 'with user that can not be found' do
+        it 'does not raise not found error' do
+          %w(creator updater locker).each do |user_type|
+            expect {
+              page.send(user_type)
+            }.to_not raise_error(ActiveRecord::RecordNotFound)
+          end
+        end
+      end
 
       context 'with user class having a name accessor' do
         let(:user) { double(name: 'Paul Page') }
@@ -1346,6 +1587,34 @@ module Alchemy
 
     it_behaves_like "having a hint" do
       let(:subject) { Page.new }
+    end
+
+    describe '#layout_partial_name' do
+      let(:page) { Page.new(page_layout: 'Standard Page') }
+
+      it "returns a partial renderer compatible name" do
+        expect(page.layout_partial_name).to eq('standard_page')
+      end
+    end
+
+    describe '#published_at' do
+      context 'with published_at date set' do
+        let(:published_at) { Time.now }
+        let(:page)         { build_stubbed(:page, published_at: published_at) }
+
+        it "returns the published_at value from database" do
+          expect(page.published_at).to eq(published_at)
+        end
+      end
+
+      context 'with published_at is nil' do
+        let(:updated_at) { Time.now }
+        let(:page)       { build_stubbed(:page, published_at: nil, updated_at: updated_at) }
+
+        it "returns the updated_at value" do
+          expect(page.published_at).to eq(updated_at)
+        end
+      end
     end
 
   end

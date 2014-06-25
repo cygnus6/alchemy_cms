@@ -131,8 +131,9 @@ module Alchemy
         let(:page)        { FactoryGirl.create(:public_page, name: 'New page name') }
         let(:second_page) { FactoryGirl.create(:public_page, name: 'Second Page') }
         let(:legacy_page) { FactoryGirl.create(:public_page, name: 'Legacy Url') }
-        let(:legacy_url)  { LegacyPageUrl.create(urlname: 'legacy-url', page: page) }
+        let!(:legacy_url) { LegacyPageUrl.create(urlname: 'legacy-url', page: page) }
         let(:legacy_url2) { LegacyPageUrl.create(urlname: 'legacy-url', page: second_page) }
+        let(:legacy_url3) { LegacyPageUrl.create(urlname: 'index.php?id=2', page: second_page) }
 
         it "should redirect permanently to page that belongs to legacy page url." do
           get :show, urlname: legacy_url.urlname
@@ -141,15 +142,18 @@ module Alchemy
         end
 
         it "should only redirect to legacy url if no page was found for urlname" do
-          legacy_url
           get :show, urlname: legacy_page.urlname
           response.status.should == 200
           response.should_not redirect_to("/#{page.urlname}")
         end
 
         it "should redirect to last page that has that legacy url" do
-          legacy_url
           get :show, urlname: legacy_url2.urlname
+          response.should redirect_to("/#{second_page.urlname}")
+        end
+
+        it "should redirect even if the url has get parameters" do
+          get :show, urlname: legacy_url3.urlname
           response.should redirect_to("/#{second_page.urlname}")
         end
       end
@@ -171,6 +175,31 @@ module Alchemy
             get :show, urlname: 'a-public-page'
             Language.current.should == Language.default
           end
+        end
+      end
+    end
+
+    describe '#page_etag' do
+      subject { controller.send(:page_etag) }
+
+      before do
+        page.stub(cache_key: 'aaa')
+        controller.instance_variable_set('@page', page)
+      end
+
+      it "returns the etag for response headers" do
+        expect(subject).to eq('aaa')
+      end
+
+      context 'with user logged in' do
+        let(:author_user) { mock_model(Alchemy.user_class, cache_key: 'bbb') }
+
+        before do
+          sign_in(author_user)
+        end
+
+        it "returns another etag for response headers" do
+          expect(subject).to eq('aaabbb')
         end
       end
     end

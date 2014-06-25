@@ -115,7 +115,7 @@ module Alchemy
 
       def all_from_clipboard(clipboard)
         return [] if clipboard.nil?
-        where(id: clipboard.collect { |e| e[:id] })
+        where(id: clipboard.collect { |e| e['id'] })
       end
 
       # All elements in clipboard that could be placed on page
@@ -193,12 +193,13 @@ module Alchemy
     #
     def content_for_rss_title
       rss_title = content_descriptions.detect { |c| c['rss_title'] }
+      return if rss_title.blank?
       contents.find_by_name(rss_title['name'])
     end
 
-    # Returns the content that is marked as rss definition.
+    # Returns the content that is marked as rss description.
     #
-    # Mark a content as rss definition in your +elements.yml+ file:
+    # Mark a content as rss description in your +elements.yml+ file:
     #
     #   - name: news
     #     contents:
@@ -207,8 +208,9 @@ module Alchemy
     #       rss_description: true
     #
     def content_for_rss_description
-      rss_title = content_descriptions.detect { |c| c['rss_description'] }
-      contents.find_by_name(rss_title['name'])
+      rss_description = content_descriptions.detect { |c| c['rss_description'] }
+      return if rss_description.blank?
+      contents.find_by_name(rss_description['name'])
     end
 
     # Returns the array with the hashes for all element contents in the elements.yml file
@@ -265,15 +267,10 @@ module Alchemy
     #
     def update_contents(contents_attributes)
       return true if contents_attributes.nil?
-      contents_attributes.each do |id, essence_attributes|
-        content = self.contents.find(id)
-        if content.update_essence(essence_attributes)
-          true
-        else
-          errors.add(:base, :essence_validation_failed)
-        end
+      contents.each do |content|
+        content.update_essence(contents_attributes["#{content.id}"]) || errors.add(:base, :essence_validation_failed)
       end
-      return errors.blank?
+      errors.blank?
     end
 
     def essences
@@ -390,8 +387,9 @@ module Alchemy
     end
 
     # The names of all cells from given page this element could be placed in.
-    def belonging_cellnames(page)
-      cellnames = page.cells.select { |c| c.available_elements.include?(self.name) }.collect(&:name).flatten.uniq
+    #
+    def available_page_cell_names(page)
+      cellnames = unique_available_page_cell_names(page)
       if cellnames.blank? || !page.has_cells?
         ['for_other_elements']
       else
@@ -447,6 +445,20 @@ module Alchemy
       elements = page.elements.published.where("#{self.class.table_name}.position #{dir} #{position}")
       elements = elements.named(name) if name.present?
       elements.reorder("position #{dir == '>' ? 'ASC' : 'DESC'}").limit(1).first
+    end
+
+    # Returns all cells from given page this element could be placed in.
+    #
+    def available_page_cells(page)
+      page.cells.select do |cell|
+        cell.available_elements.include?(self.name)
+      end
+    end
+
+    # Returns all uniq cell names from given page this element could be placed in.
+    #
+    def unique_available_page_cell_names(page)
+      available_page_cells(page).collect(&:name).uniq
     end
 
   end

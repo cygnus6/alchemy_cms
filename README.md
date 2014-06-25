@@ -1,7 +1,7 @@
-![Alchemy CMS](http://alchemy-cms.com/assets/alchemy_logo.png)
+![Alchemy CMS](http://alchemy-cms.com/assets/alchemy_logo.svg)
 
 [![Gem Version](https://badge.fury.io/rb/alchemy_cms.png)](http://badge.fury.io/rb/alchemy_cms)
-[![Build Status](https://secure.travis-ci.org/magiclabs/alchemy_cms.png?branch=master)](http://travis-ci.org/magiclabs/alchemy_cms) [![Code Climate](https://codeclimate.com/github/magiclabs/alchemy_cms.png)](https://codeclimate.com/github/magiclabs/alchemy_cms) [![Coverage Status](https://coveralls.io/repos/magiclabs/alchemy_cms/badge.png?branch=master)](https://coveralls.io/r/magiclabs/alchemy_cms?branch=master)
+[![Build Status](https://travis-ci.org/magiclabs/alchemy_cms.svg?branch=master)](https://travis-ci.org/magiclabs/alchemy_cms) [![Code Climate](https://codeclimate.com/github/magiclabs/alchemy_cms.png)](https://codeclimate.com/github/magiclabs/alchemy_cms) [![Coverage Status](https://coveralls.io/repos/magiclabs/alchemy_cms/badge.png?branch=master)](https://coveralls.io/r/magiclabs/alchemy_cms?branch=master)
 
 About
 -----
@@ -10,8 +10,8 @@ Alchemy is the most powerful, userfriendly and flexible Rails CMS.
 
 Read more on the [website](http://alchemy-cms.com) and in the [guidelines](http://guides.alchemy-cms.com).
 
-**This master branch is a development branch that can contain bugs. For productive environments you should use the [current Ruby gem version](http://rubygems.org/gems/alchemy_cms/versions/2.7.2),
-or the [latest stable branch (2.7-stable)](https://github.com/magiclabs/alchemy_cms/tree/2.7-stable).**
+**This master branch is a development branch that can contain bugs. For productive environments you should use the [current Ruby gem version](http://rubygems.org/gems/alchemy_cms/versions/2.8.1),
+or the [latest stable branch (2.8-stable)](https://github.com/magiclabs/alchemy_cms/tree/2.8-stable).**
 
 Features
 --------
@@ -37,7 +37,7 @@ Rails Version
 
 **This version of Alchemy CMS runs with Rails 4 (including 4.1)**
 
-If you are looking for a Rails 3.2 compatible version check the [2.7-stable branch](https://github.com/magiclabs/alchemy_cms/tree/2.7-stable).
+If you are looking for a Rails 3.2 compatible version check the [2.8-stable branch](https://github.com/magiclabs/alchemy_cms/tree/2.8-stable).
 
 If you are looking for a Rails 3.1 compatible version check the [2.1-stable branch](https://github.com/magiclabs/alchemy_cms/tree/2.1-stable).
 
@@ -60,7 +60,7 @@ Installation
 
 #### 1. Use the installer:
 
-    gem install alchemy_cms
+    gem install alchemy_cms --pre
     alchemy new my_magicpage
     cd my_magicpage
 
@@ -113,6 +113,50 @@ Run in terminal:
     Alchemy.login_path = '/your/login/path'
     Alchemy.logout_path = '/your/logout/path'
 
+The only thing Alchemy needs to know from your user model is the `alchemy_roles` method.
+
+This method has to return an `Array` or `ActiveRecord::Relation` with at least one of the following roles:
+
+* `member`
+* `author`
+* `editor`
+* `admin`
+
+Example:
+
+    def alchemy_roles
+      self.admin?
+        %w(admin)
+      end
+    end
+
+**Optionally** you can add a `alchemy_display_name` method that returns a name representing the currently logged in user. This is used in the admin views.
+
+Example:
+
+    def alchemy_display_name
+      "#{first_name} #{last_name}".strip
+    end
+
+Testing
+-------
+
+Before running tests (which refer to Alchemy), please make sure to run the rake task
+
+    bundle exec rake alchemy:spec:prepare
+
+to set up the database for testing.
+
+Now you can run your tests, e. g. with RSpec:
+
+    bundle exec rspec spec/...
+
+**Alternatively** you can just run:
+
+    bundle exec rake
+
+This default task executes the database preparations and runs all defined test cases.
+
 Deployment
 ----------
 
@@ -142,7 +186,7 @@ Run in terminal:
     bin/rake alchemy:upgrade
 
 
-Tipps
+Tips
 -----
 
 - Read the guidelines: http://guides.alchemy-cms.com.
@@ -162,7 +206,7 @@ Resources
 ---------
 
 * Homepage: <http://alchemy-cms.com>
-* Live-Demo: <http://edge-demo.alchemy-cms.com> (user: demo, password: demo123)
+* Live-Demo: <http://demo.alchemy-cms.com> (user: demo, password: demo123)
 * API Documentation: <http://rubydoc.info/github/magiclabs/alchemy_cms>
 * Issue-Tracker: <https://github.com/magiclabs/alchemy_cms/issues>
 * Sourcecode: <https://github.com/magiclabs/alchemy_cms>
@@ -182,4 +226,4 @@ Authors
 License
 -------
 
-* BSD: <https://raw.github.com/magiclabs/alchemy_cms/2.7-stable/LICENSE>
+* BSD: <https://raw.github.com/magiclabs/alchemy_cms/master/LICENSE>

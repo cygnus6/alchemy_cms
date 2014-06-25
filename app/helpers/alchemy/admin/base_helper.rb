@@ -14,6 +14,18 @@ module Alchemy
       include Alchemy::BaseHelper
       include Alchemy::Admin::NavigationHelper
 
+      # Returns a string showing the name of the currently logged in user.
+      #
+      # In order to represent your own +User+'s class instance,
+      # you should add a +alchemy_display_name+ method to your +User+ class
+      #
+      def current_alchemy_user_name
+        name = current_alchemy_user.try(:alchemy_display_name)
+        if name.present?
+          content_tag :span, "#{_t('Logged in as')} #{name}", class: 'current-user-name'
+        end
+      end
+
       # This helper renders the link to an dialog.
       #
       # We use this for our fancy modal dialogs in the Alchemy cockpit.
@@ -357,11 +369,19 @@ module Alchemy
       #   The value the input displays
       #
       def alchemy_datepicker(object, method, html_options={})
-        text_field(object.class.name.underscore.to_sym, method.to_sym, {
-          :type => 'date',
-          :class => 'thin_border date',
-          :value => object.send(method.to_sym).nil? ? nil : l(object.send(method.to_sym), :format => :datepicker)
-        }.merge(html_options))
+        value = nil
+        if object.send(method.to_sym).present?
+          value = l(object.send(method.to_sym), format: :datepicker)
+        elsif html_options[:value].present?
+          date = html_options.delete(:value)
+          date = Time.parse(date) if date.is_a?(String)
+          value = l(date, format: :datepicker)
+        end
+        text_field object.class.name.underscore.to_sym, method.to_sym, html_options.merge({
+          type: 'date',
+          class: 'date',
+          value: value
+        })
       end
 
       # Merges the params-hash with the given hash
@@ -414,6 +434,11 @@ module Alchemy
           end
           options_for_select(options)
         end
+      end
+
+      # Returns the regular expression used for external url validation in link dialog.
+      def link_url_regexp
+        Alchemy::Config.get(:format_matchers)['link_url'] || /^(mailto:|\/|[a-z]+:\/\/)/
       end
 
       private

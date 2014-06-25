@@ -33,11 +33,12 @@ class window.Alchemy.Dialog
     @bind_close_events()
     window.requestAnimationFrame =>
       @dialog_container.addClass('open')
-    unless @options.modal
-      @dialog.draggable
-        iframeFix: true
-        handle: '.alchemy-dialog-title'
-        containment: 'parent'
+      @overlay.addClass('open') if @overlay?
+    @dialog.draggable
+      iframeFix: true
+      handle: '.alchemy-dialog-title'
+      containment: 'parent'
+    @$body.addClass('prevent-scrolling')
     Alchemy.currentDialogs.push(this)
     @load()
     true
@@ -46,9 +47,12 @@ class window.Alchemy.Dialog
   close: ->
     @$document.off 'keydown'
     @dialog_container.removeClass('open')
+    @overlay.removeClass('open') if @overlay?
     @$document.on 'webkitTransitionEnd transitionend oTransitionEnd', =>
       @$document.off 'webkitTransitionEnd transitionend oTransitionEnd'
       @dialog_container.remove()
+      @overlay.remove() if @overlay?
+      @$body.removeClass('prevent-scrolling')
       Alchemy.currentDialogs.pop(this)
       if @options.closed?
         @options.closed()
@@ -99,9 +103,10 @@ class window.Alchemy.Dialog
     form = $('[data-remote="true"]', @dialog_body)
     form.bind "ajax:complete", (e, xhr, status) =>
       content_type = xhr.getResponseHeader('Content-Type')
+      Alchemy.Buttons.enable(@dialog_body)
       if status == 'success'
         if content_type.match(/javascript/)
-          @close()
+          return
         else
           @dialog_body.html(xhr.responseText)
           @init()
@@ -127,7 +132,7 @@ class window.Alchemy.Dialog
           error_header = "#{xhr.statusText} (#{xhr.status})"
         error_body = "Please check log and try again."
     $errorDiv = $("<div class=\"message #{error_type}\" />")
-    $errorDiv.append '<span class="icon warning"></span>'
+    $errorDiv.append "<span class=\"icon #{error_type}\" />"
     $errorDiv.append "<h1>#{error_header}</h1>"
     $errorDiv.append "<p>#{error_body}</p>"
     @dialog_body.html $errorDiv
@@ -140,10 +145,10 @@ class window.Alchemy.Dialog
     @close_button.click =>
       @close()
       false
-    if @overlay
-      @overlay.addClass('closable').click =>
-        @close()
-        false
+    @dialog_container.addClass('closable').click (e) =>
+      return true if e.target != @dialog_container.get(0)
+      @close()
+      false
     @$document.keydown (e) =>
       if e.which == 27
         @close()
@@ -164,12 +169,12 @@ class window.Alchemy.Dialog
     @dialog_header.append(@close_button)
     @dialog.append(@dialog_header)
     @dialog.append(@dialog_body)
-    if @options.modal
-      @overlay = $('<div class="alchemy-dialog-overlay" />')
-      @dialog_container.append(@overlay)
     @dialog_container.append(@dialog)
     @dialog.addClass('modal') if @options.modal
     @dialog_body.addClass('padded') if @options.padding
+    if @options.modal
+      @overlay = $('<div class="alchemy-dialog-overlay" />')
+      @$body.append(@overlay)
     @$body.append(@dialog_container)
     @resize()
     @dialog

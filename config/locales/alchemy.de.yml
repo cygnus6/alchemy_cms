@@ -10,78 +10,64 @@ de:
     # Just use the page_layouts name like defined inside the config/alchemy/page_layouts.yml file and translate it.
     #
     # Example:
-    #   de:
-    #     alchemy:
-    #       page_layout_names:
-    #         contact: Kontakt
-    #         search: Suche
+    #
+    # de:
+    #   alchemy:
+    #     page_layout_names:
+    #       contact: Kontakt
+    #       search: Suche
     #
     page_layout_names:
-      contact: Kontakt
-      search: Suche
-      layout_header: 'Header Bereich'
-      layout_footer: 'Footer Bereich'
-      external: Externer Link
 
     # == Translations for element names
     # Just use the elements name like defined inside the config/alchemy/elements.yml file and translate it.
     #
     # Example:
-    #   de:
-    #     alchemy:
-    #       element_names:
-    #         article: Artikel
-    #         intro_image_text: Intro Artikel
+    #
+    # de:
+    #   alchemy:
+    #     element_names:
+    #       article: Artikel
+    #       contactform: Kontaktformular
     #
     element_names:
-      article: Artikel
-      intro_image_text: Intro Artikel
-      text: Text
-      bild: Bild(er)
-      bild_text: Text (Bild)
-      headline: Überschrift
-      image_mosaic: Bildergalerie
-      footnote: Fußnote
-      sitename: Webseiten Name
-      claim: Claim
-      header: Header-Bild
-      intro: Intro
-      subheadline: Zwischenüberschrift
-      news: News
-      searchresult: Suchergebnisse
-      contactform: Kontaktformular
 
     # == Translated names for contents in elements.
     # Used for the content editor label inside the element editor view (The elements window)
     #
     # Tip: You can translate content names globally for all contents of this name, or specificly for an element.
     # To do so, just place the content_name under the element name
+    #
+    # Example:
+    #
+    # de:
+    #  alchemy:
+    #    content_names:
+    #      headline: Überschrift
+    #      news_article:
+    #        headline: News Überschrift
+    #      image_caption: Bildunterschrift
+    #      show_caption: Zeige Bildunterschrift
+    #
     content_names:
-      text: 'Text'
-      date: 'Datum'
-      body: 'Inhalt'
-      image: 'Bild'
-      mail_from: 'Absender (E-Mail)'
-      mail_to: 'Empfänger (E-Mail)'
-      caption: "Bildunterschrift"
-      subject: 'Betreff'
-      intro: "Einleitung"
-      headline: "Überschrift"
-      subheadline: "Unterüberschrift"
-      news_headline: "News Überschrift"
-      image_mosaic:
-        caption: "Mosaik Bildunterschrift"
-        show_caption: "Bildunterschrift anzeigen"
-      file: Datei
-      contactform:
-        success_page: 'Folgeseite'
 
-    # Translations for content validations
+    # === Translations for content validations
+    # Used when a user did not enter (correct) values to the content field.
+    #
+    # Tip: You can define the validation messages translations different for each element and content
+    #
+    # Example:
+    #
+    # de:
+    #   alchemy:
+    #     content_validations:
+    #       contactform:
+    #         success_page:
+    #           blank: 'Bitte wählen Sie eine Folgeseite.'
+    #         mail_to:
+    #           blank: 'Bitte geben Sie eine E-Mail Adresse an zu der das Kontaktformular sendet.'
     #
     content_validations:
-      contactform:
-        success_page:
-          blank: 'Bitte wählen Sie eine Folgeseite'
       errors:
         blank: '%{field} darf nicht leer sein'
         invalid: '%{field} hat das falsche Format'
@@ -122,6 +108,7 @@ de:
       de: 'DE'
       en: 'EN'
       nl: 'NL'
+      fr: 'FR'
 
     # == User roles translations
     user_roles:
@@ -169,11 +156,12 @@ de:
       site:
         aliases: Weitere Domains bitte mit Leerzeichen oder Leerzeile getrennt angeben.
 
+    anchor: 'Sprungmarke'
     back: 'zurück'
     create_tree_as_new_language: "%{language} als neuen Sprachbaum anlegen"
-    "<a href=\"http://get.adobe.com/flashplayer\" target=\"_blank\">%{value}</a>": ""
     "Active Pages": "Aktive Seiten"
     "Add global page": "Neue globale Seite"
+    "Add page link": "Verweis hinzufügen"
     "Adobe Website": "Adobe Webseite"
     "Alchemy is open software and itself uses open software and free resources:": "Alchemy ist offene Software und benutzt selbst offene Software und freie Ressourcen:"
     "Alchemy is up to date": 'Alchemy ist aktuell'
@@ -204,7 +192,7 @@ de:
     "File uploaded succesfully": "Datei %{name} wurde hochgeladen"
     "File successfully updated": "Datei wurde erfolgreich gespeichert."
     "File upload error": "Datei konnte nicht hochgeladen werden: %{error}"
-    "File: '%{name}' deleted successfully": "%{name} wurde gelöscht"
+    "File deleted successfully": "%{name} wurde gelöscht"
     "Filter by tag": "Nach Tag filtern"
     "Flush page cache": "Seitencache löschen"
     "Flush picture cache": "Bildercache löschen"
@@ -214,11 +202,9 @@ de:
     "If you have any problems using the Flash uploader you can switch to": "Sollten Sie Probleme mit dem Flash® Uploader haben, wechseln Sie einfach zur %{link}"
     "Image missing": "Bild fehlt"
     "Image size": "Bildgröße"
-    "Image updated successfully": "Bild wurde gespeichert"
-    "Index Error after saving Element. Please try again!": "Indizierungsfehler beim Speichern des Elements. Bitte erneut versuchen!"
-    "Language successfully created.": "Sprache wurde erfolgreich erstellt."
-    "Language successfully destroyed.": "Sprache wurde erfolgreich gelöscht."
-    "Language successfully updated.": "Sprache wurde erfolgreich aktualisiert."
+    "Language successfully created": "Sprache wurde erfolgreich erstellt."
+    "Language successfully removed": "Sprache wurde erfolgreich gelöscht."
+    "Language successfully updated": "Sprache wurde erfolgreich aktualisiert."
     "Language tree": "Sprachbaum"
     "Layout default": "Standard des Layouts"
     "Library shortcuts": "Tastaturbefehle in der Bibliothek"
@@ -228,11 +214,11 @@ de:
     "New": "Neu"
     "New Element": "Element hinzufügen"
     "New page": "Neue Seite"
+    "No page links for this page found": "Keine Verweise vorhanden."
     "New password": "Neues Passwort"
     "New Tag": "Neues Tag"
     "New Tag Created": "Neues Tag wurde erstellt"
     "No": "Nein"
-    "No EssenceType given": ""
     "No items in your clipboard": "Ihre Zwischenablage ist leer"
     "No Tags found": "Keine Tags gefunden"
     "None": "ohne"
@@ -251,7 +237,6 @@ de:
     "Picture validation error": "Bild %{name} konnte nicht hochgeladen werden"
     "Picture renamed successfully": "Bild wurde erfolgreich von %{from} nach %{to} umbenannt"
     "Picture deleted successfully": "%{name} wurde gelöscht"
-    "Pictures deleted successfully": "Die Bilder %{names} wurden gelöscht"
     "Pictures updated successfully": "Die Bilder wurden gespeichert"
     "Picture cache flushed": "Bildercache wurde geleert"
     "Please Signup": "Um Ihre Homepage bearbeiten zu können, müssen Sie als erstes einen Admin Benutzer einrichten."
@@ -260,7 +245,7 @@ de:
     "Please enter your email address": "Bitte geben Sie Ihre E-Mail-Adresse ein."
     "Please log in": "Bitte melden Sie sich an."
     "Please seperate the tags with commata": "* Die Tags bitte mit Komma getrennt eingeben."
-    use_alternative_uploader_instead: "Benutzen Sie bitte diesen alternativen Uploader."
+    "Properties": "Eigenschaften"
     "Publish page": "veröffentlichen"
     "Read the License": "Lizenz lesen"
     "Redirects to": "Leitet weiter auf"
@@ -279,17 +264,17 @@ de:
     "Show clipboard": "Zwischenablage anzeigen"
     "Show picture infos": "Bild Informationen anzeigen"
     "Show trash": "Papierkorb anzeigen"
+    "Site successfully created": "Website wurde erfolgreich erstellt."
+    "Site successfully removed": "Website wurde erfolgreich gelöscht."
+    "Site successfully updated": "Website wurde erfolgreich aktualisiert."
     "Size": "Größe"
     "Sort pages": "Seiten sortieren"
     "Successfully added content": "%{content} wurde hinzugefügt"
     "Successfully deleted content": "%{content} wurde gelöscht"
     "Successfully saved content position": "Die Position wurde gespeichert."
-    "Switch to Flash® Uploader": "Auf den Flash® Uploader wechseln"
-    sitemap_editor_info: "Die Sitemap wird automatisch generiert"
-    searchresults_editor_info: "Dieses Element stellt die Suchergebnisse dar. Es Bedarf keinerlei Anpassung."
     "Tags": "Tags"
     "These pictures could not be deleted, because they were in use": "Diese Bilder konnten nicht gelöscht werden, da sie in Benutzung sind: %{names}"
-    "This page is locked by %{name}": "Diese Seite wird gerade von %{name} blockiert"
+    "This page is locked": "Diese Seite wird gerade von %{name} blockiert"
     "Title": "Titel"
     "Trash": "Papierkorb"
     "User created": "%{name} wurde erstellt"
@@ -306,11 +291,11 @@ de:
     "Who else is online": "Wer ist noch online"
     "Yes": "Ja"
     "You are not authorized": "Sie sind dazu nicht authorisiert."
-    "You are about to edit %{length} pictures at once": "Sie sind dabei %{length} Bilder auf einmal zu bearbeiten."
+    "You are about to edit many pictures at once": "Sie sind dabei %{length} Bilder auf einmal zu bearbeiten."
     element_dirty_close_window_notice: "Sie haben ungesicherte Elemente. Möchten Sie das Elemente Fenster wirklich schließen?"
     "You may upload files with following extensions": "Sie können %{file_types_description} mit folgenden Endungen hochladen: %{file_types}"
     "You may upload any file": "Sie können jede Art von Datei hochladen."
-    "Your last login was on %{time}": "Sie waren zuletzt angemeldet am %{time}."
+    "Your last login was on": "Sie waren zuletzt angemeldet am %{time}."
     "Your last updated pages": "Ihre zuletzt bearbeiteten Seiten"
     "Your trash is empty": "Der Papierkorb ist leer"
     above: "darüber"
@@ -319,7 +304,6 @@ de:
     add_image_to_element: "Bild hinzufügen"
     align_in_text: "Im Text anordnen"
     all: "alle"
-    allow_fullscreen: "Vollbild ansicht"
     all_pictures: "Alle Bilder anzeigen"
     apply: "übernehmen"
     assign_file: "Datei zuweisen"
@@ -341,9 +325,7 @@ de:
     confirm_to_delete_image: "Wollen Sie dieses Bild wirklich löschen?"
     confirm_to_delete_image_from_server: "Wollen Sie dieses Bild wirklich vom Server löschen?"
     confirm_to_delete_images_from_server: "Wollen Sie diese Bilder wirklich vom Server löschen?"
-    confirm_to_delete_language: "Wollen Sie diese Sprache wirklich löschen?<br/>ACHTUNG! Alle zugehörigen Seiten werden ebenfalls gelöscht!"
     confirm_to_delete_page: "Wollen Sie diese Seite wirklich löschen? Alle Inhalte gehen dabei unwiderruflich verloren!"
-    contactform_body: "Nachrichten Vorlage"
     content_essence_not_found: "Essenz wurde nicht gefunden"
     content_not_found: "Das Feld für diesen Inhalt ist nicht vorhanden."
     content_validations_headline: "Bitte überprüfen Sie die markierten Felder."
@@ -423,7 +405,9 @@ de:
     image_name: "Name"
     image_title: "Titel-Tag"
     images: "Bilder"
-    internal_link_headline: "Wählen Sie eine Seite zum Verlinken."
+    internal_link_headline: "Wählen Sie eine Seite zum Verlinken aus."
+    internal_link_page_elements_explanation: "Zusätzlich können Sie rechts neben der jeweiligen Seite auf 'Elemente anzeigen' klicken, um eine Sprungmarke zu einem Element dieser Seite zu erstellen."
+    internal_link_page_anchors_explanation: "Alternativ können Sie auch eine Sprungmarke innerhalb der aktuellen Seite erstellen."
     "item copied to clipboard": "%{name} wurde in die Zwischenablage kopiert."
     "item moved to clipboard": "%{name} wurde in die Zwischenablage bewegt."
     "item removed from clipboard": "%{name} wurde aus der Zwischenablage entfernt."
@@ -434,6 +418,7 @@ de:
     language_pages_copied: "Der Sprachbaum wurde kopiert"
     last_upload_only: "Zuletzt hochgeladene"
     left: "links"
+    legacy_url_info_text: "Ein Verweis ist eine Weiterleitung einer alten URL auf die aktuelle URL dieser Seite. Diese Weiterleitung findet mit einem <a href='https://support.google.com/webmasters/answer/93633' target='_blank'>301-Status-Code</a> statt."
     link_image: "Bild verlinken"
     link_overlay_tab_label:
       contactform: "Kontaktformular"
@@ -536,7 +521,7 @@ de:
     rename_file: "Datei umbenennen"
     rename: umbenennen
     replace: ersetzen
-    'Replaced Tag %{old_tag} with %{new_tag}': "Das Tag '%{old_tag}' wurde durch das Tag '%{new_tag}' ersetzt"
+    'Replaced Tag': "Das Tag '%{old_tag}' wurde durch das Tag '%{new_tag}' ersetzt"
     resources:
       relation_select:
         blank: '- ohne -'
@@ -567,7 +552,6 @@ de:
     insert_image: "Bild einfügen"
     tag_list: Tags
     tags_get_created_if_used_the_first_time: 'Ein Tag wird automatisch erstellt, sobald Sie es das erste mal verwenden.'
-    this_picture_is_not_used_on_any_page: "Dieses Bild wird auf keiner Seite benutzt."
     this_picture_is_used_on_these_pages: "Dieses Bild wird auf folgenden Seiten benutzt"
     title: "Titel"
     to_alchemy: "Zu Alchemy"
@@ -576,7 +560,6 @@ de:
     unlink: "Link entfernen"
     unlock_page: "Seite verlassen"
     unlocked_page: "Seite %{name} wurde freigegeben."
-    upload: "Datei hochladen"
     upload_file: "Datei(en) hochladen"
     upload_image: "Bild(er) hochladen"
     url_name: "URL-Name"
@@ -597,7 +580,6 @@ de:
     "Do you want to": "Wollen Sie dabei"
     "stay logged in": "angemeldet bleiben"
     "or to completly": "oder Sich komplett"
-    "Please wait. Flash® is loading...": "Bitte warten. Flash® Uploader wird geladen..."
     "Are you sure?": "Sind Sie sicher?"
     "Create": "Hinzufügen"
     "Edit": "Bearbeiten"
@@ -607,13 +589,10 @@ de:
     "Succesfully removed": "Erfolgreich gelöscht"
     "Nothing found": "Keine Einträge gefunden."
     "Or drag files over here": "Oder ziehen Sie die Dateien hier rauf"
-    "Now drop the files": "Lassen Sie die Dateien nun los"
-    "Queued x files": "x Dateien in der Warteschlange."
     complete: 'Abgeschlossen'
     "Update available": 'Es ist ein Update verfügbar'
     "Update status unavailable": 'Update Status konnte nicht ermittelt werden'
     "Uploading": "Hochladen"
-    "Uploaded x files": "x Dateien hochgeladen."
 
   # END of Alchemy translation
 
@@ -822,6 +801,10 @@ de:
         one: "Element"
         other: "Elemente"
 
+      alchemy/legacy_page_url:
+        one: "Verweis"
+        other: "Verweise"
+
       alchemy/language:
         one: "Sprache"
         other: "Sprachen"
@@ -830,13 +813,13 @@ de:
         one: "Seite"
         other: "Seiten"
 
-      alchemy/picture:
-        one: Bild
-        other: Bilder
-
       alchemy/site:
         one: Website
         other: Websites
+
+      alchemy/picture:
+        one: Bild
+        other: Bilder
 
     attributes:
 
@@ -883,6 +866,9 @@ de:
         name: "Name"
         page_layout: "Seitentyp der Startseite"
         public: "Sprache veröffentlichen"
+
+      alchemy/legacy_page_url:
+        urlname: "URL-Pfad"
 
       alchemy/page:
         created_at: "Erstellt am"

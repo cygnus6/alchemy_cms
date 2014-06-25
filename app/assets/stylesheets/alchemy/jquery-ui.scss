@@ -131,6 +131,8 @@
 
 .ui-widget-content a {
   color: $text-color;
+
+  &:hover { color: #000 }
 }
 
 .ui-widget-header {
@@ -1244,7 +1246,8 @@
   display: none;
 
   select {
-    height: 19px;
+    height: 20px;
+    padding: 1px;
   }
 }
 

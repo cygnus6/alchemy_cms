@@ -37,11 +37,12 @@ module Alchemy
     end
 
     describe "#flush" do
-      let(:page_1) { build_stubbed(:page) }
-      let(:page_2) { build_stubbed(:page) }
+      let(:language) { mock_model('Language', code: 'en', pages: double(flushables: [page_1, page_2])) }
+      let(:page_1)   { build_stubbed(:page) }
+      let(:page_2)   { build_stubbed(:page) }
 
       before do
-        Language.stub_chain(:current, :pages, :flushables).and_return([page_1, page_2])
+        Language.stub(current: language)
       end
 
       it "should remove the cache of all pages" do
@@ -53,10 +54,10 @@ module Alchemy
 
     describe '#new' do
       context "pages in clipboard" do
-        let(:clipboard) { session[:clipboard] = Clipboard.new }
+        let(:clipboard) { session[:alchemy_clipboard] = {} }
         let(:page) { mock_model(Alchemy::Page, name: 'Foobar') }
 
-        before { clipboard[:pages] = [{id: page.id, action: 'copy'}] }
+        before { clipboard['pages'] = [{'id' => page.id.to_s, 'action' => 'copy'}] }
 
         it "should load all pages from clipboard" do
           xhr :get, :new, {page_id: page.id}
@@ -95,14 +96,120 @@ module Alchemy
       end
     end
 
+    describe '#order' do
+      let(:page_1)       { FactoryGirl.create(:page, visible: true) }
+      let(:page_2)       { FactoryGirl.create(:page, visible: true) }
+      let(:page_3)       { FactoryGirl.create(:page, visible: true) }
+      let(:page_item_1)  { {id: page_1.id, slug: page_1.slug, restricted: false, external: page_1.redirects_to_external?, visible: page_1.visible?, children: [page_item_2]} }
+      let(:page_item_2)  { {id: page_2.id, slug: page_2.slug, restricted: false, external: page_2.redirects_to_external?, visible: page_2.visible?, children: [page_item_3]} }
+      let(:page_item_3)  { {id: page_3.id, slug: page_3.slug, restricted: false, external: page_3.redirects_to_external?, visible: page_3.visible? } }
+      let(:set_of_pages) { [page_item_1] }
+
+      it "stores the new order" do
+        xhr :post, :order, set: set_of_pages.to_json
+        page_1.reload
+        expect(page_1.descendants).to eq([page_2, page_3])
+      end
+
+      context 'with url nesting enabled' do
+        before { Alchemy::Config.stub(get: true) }
+
+        it "updates the pages urlnames" do
+          xhr :post, :order, set: set_of_pages.to_json
+          [page_1, page_2, page_3].map(&:reload)
+          expect(page_1.urlname).to eq("#{page_1.slug}")
+          expect(page_2.urlname).to eq("#{page_1.slug}/#{page_2.slug}")
+          expect(page_3.urlname).to eq("#{page_1.slug}/#{page_2.slug}/#{page_3.slug}")
+        end
+
+        context 'with invisible page in tree' do
+          let(:page_item_2) do
+            {
+              id: page_2.id,
+              slug: page_2.slug,
+              children: [page_item_3],
+              visible: false
+            }
+          end
+
+          it "does not use this pages slug in urlnames of descendants" do
+            xhr :post, :order, set: set_of_pages.to_json
+            [page_1, page_2, page_3].map(&:reload)
+            expect(page_1.urlname).to eq("#{page_1.slug}")
+            expect(page_2.urlname).to eq("#{page_1.slug}/#{page_2.slug}")
+            expect(page_3.urlname).to eq("#{page_1.slug}/#{page_3.slug}")
+          end
+        end
+
+        context 'with external page in tree' do
+          let(:page_item_2) do
+            {
+              id: page_2.id,
+              slug: page_2.slug,
+              children: [page_item_3],
+              external: true
+            }
+          end
+
+          it "does not use this pages slug in urlnames of descendants" do
+            xhr :post, :order, set: set_of_pages.to_json
+            [page_1, page_2, page_3].map(&:reload)
+            expect(page_3.urlname).to eq("#{page_1.slug}/#{page_3.slug}")
+          end
+        end
+
+        context 'with restricted page in tree' do
+          let(:page_2) { FactoryGirl.create(:page, restricted: true) }
+          let(:page_item_2) do
+            {
+              id: page_2.id,
+              slug: page_2.slug,
+              children: [page_item_3],
+              restricted: true
+            }
+          end
+
+          it "updates restricted status of descendants" do
+            xhr :post, :order, set: set_of_pages.to_json
+            page_3.reload
+            expect(page_3.restricted).to be_true
+          end
+        end
+
+        context 'with page having number as slug' do
+          let(:page_item_2) do
+            {
+              id: page_2.id,
+              slug: 42,
+              children: [page_item_3]
+            }
+          end
+
+          it "does not raise error" do
+            expect {
+              xhr :post, :order, set: set_of_pages.to_json
+            }.to_not raise_error(TypeError)
+            [page_1, page_2, page_3].map(&:reload)
+            expect(page_3.urlname).to eq("#{page_1.slug}/#{page_2.slug}/#{page_3.slug}")
+          end
+        end
+
+        it "creates legacy urls" do
+          xhr :post, :order, set: set_of_pages.to_json
+          [page_2, page_3].map(&:reload)
+          expect(page_2.legacy_urls.size).to eq(1)
+          expect(page_3.legacy_urls.size).to eq(1)
+        end
+      end
+    end
+
     describe "#configure" do
       render_views
 
       context "with page having nested urlname" do
-        let(:page) { mock_model(Page, {name: 'Foobar', slug: 'foobar', urlname: 'root/parent/foobar', redirects_to_external?: false, layoutpage?: false, taggable?: false}) }
+        let(:page) { create(:page, name: 'Foobar') }
 
         it "should always show the slug" do
-          Page.stub(:find).and_return(page)
           xhr :get, :configure, {id: page.id}
           response.body.should match /value="foobar"/
         end
@@ -233,15 +340,70 @@ module Alchemy
       end
     end
 
+    describe '#edit' do
+      let!(:page)       { create(:page) }
+      let!(:other_user) { create(:author_user) }
+
+      context 'if page is locked by another user' do
+        before { page.lock_to!(other_user) }
+
+        context 'that is signed in' do
+          before { DummyUser.any_instance.stub(logged_in?: true) }
+
+          it 'redirects to sitemap' do
+            get :edit, id: page.id
+            expect(response).to redirect_to(admin_pages_path)
+          end
+        end
+
+        context 'that is not signed in' do
+          before { DummyUser.any_instance.stub(logged_in?: false) }
+
+          it 'renders the edit view' do
+            get :edit, id: page.id
+            expect(response).to render_template(:edit)
+          end
+        end
+      end
+
+      context 'if page is locked by myself' do
+        before do
+          Page.any_instance.stub(locker: user)
+          user.stub(logged_in?: true)
+        end
+
+        it 'renders the edit view' do
+          get :edit, id: page.id
+          expect(response).to render_template(:edit)
+        end
+      end
+
+      context 'if page is not locked' do
+        before do
+          Page.any_instance.stub(locker: nil)
+        end
+
+        it 'renders the edit view' do
+          get :edit, id: page.id
+          expect(response).to render_template(:edit)
+        end
+
+        it "lockes the page to myself" do
+          Page.any_instance.should_receive(:lock_to!)
+          get :edit, id: page.id
+        end
+      end
+    end
+
     describe '#destroy' do
-      let(:clipboard) { session[:clipboard] = Clipboard.new }
+      let(:clipboard) { session[:alchemy_clipboard] = {} }
       let(:page) { FactoryGirl.create(:public_page) }
 
-      before { clipboard[:pages] = [{id: page.id}] }
+      before { clipboard['pages'] = [{'id' => page.id.to_s}] }
 
       it "should also remove the page from clipboard" do
         xhr :post, :destroy, {id: page.id, _method: :delete}
-        clipboard[:pages].should be_empty
+        clipboard['pages'].should be_empty
       end
     end
 

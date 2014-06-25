@@ -122,11 +122,12 @@ module Alchemy
     describe '.all_from_clipboard_for_page' do
       let(:element_1) { FactoryGirl.build_stubbed(:element) }
       let(:element_2) { FactoryGirl.build_stubbed(:element, name: 'news') }
-      let(:page) { FactoryGirl.build_stubbed(:public_page) }
-      let(:clipboard) { [{id: element_1.id}, {id: element_2.id}] }
-      before {
+      let(:page)      { FactoryGirl.build_stubbed(:public_page) }
+      let(:clipboard) { [{'id' => element_1.id.to_s}, {'id' => element_2.id.to_s}] }
+
+      before do
         Element.stub(:all_from_clipboard).and_return([element_1, element_2])
-      }
+      end
 
       it "return all elements from clipboard that could be placed on page" do
         elements = Element.all_from_clipboard_for_page(clipboard, page)
@@ -166,11 +167,9 @@ module Alchemy
       end
     end
 
-    describe '#belonging_cellnames' do
-      before do
-        @page = FactoryGirl.create(:public_page)
-        @element = FactoryGirl.create(:element, :page => @page)
-      end
+    describe '#available_page_cell_names' do
+      let(:page)    { FactoryGirl.create(:public_page) }
+      let(:element) { FactoryGirl.create(:element, page: page) }
 
       context "with page having cells defining the correct elements" do
         before do
@@ -182,16 +181,16 @@ module Alchemy
         end
 
         it "should return a list of all cells from given page this element could be placed in" do
-          @header_cell = FactoryGirl.create(:cell, :name => 'header', :page => @page)
-          @footer_cell = FactoryGirl.create(:cell, :name => 'footer', :page => @page)
-          @sidebar_cell = FactoryGirl.create(:cell, :name => 'sidebar', :page => @page)
-          @element.belonging_cellnames(@page).should include('header')
-          @element.belonging_cellnames(@page).should include('footer')
+          FactoryGirl.create(:cell, name: 'header', page: page)
+          FactoryGirl.create(:cell, name: 'footer', page: page)
+          FactoryGirl.create(:cell, name: 'sidebar', page: page)
+          element.available_page_cell_names(page).should include('header')
+          element.available_page_cell_names(page).should include('footer')
         end
 
         context "but without any cells" do
           it "should return the 'nil cell'" do
-            @element.belonging_cellnames(@page).should == ['for_other_elements']
+            element.available_page_cell_names(page).should == ['for_other_elements']
           end
         end
 
@@ -207,10 +206,10 @@ module Alchemy
         end
 
         it "should return the 'nil cell'" do
-          @header_cell = FactoryGirl.create(:cell, :name => 'header', :page => @page)
-          @footer_cell = FactoryGirl.create(:cell, :name => 'footer', :page => @page)
-          @sidebar_cell = FactoryGirl.create(:cell, :name => 'sidebar', :page => @page)
-          @element.belonging_cellnames(@page).should == ['for_other_elements']
+          FactoryGirl.create(:cell, name: 'header', page: page)
+          FactoryGirl.create(:cell, name: 'footer', page: page)
+          FactoryGirl.create(:cell, name: 'sidebar', page: page)
+          element.available_page_cell_names(page).should == ['for_other_elements']
         end
       end
     end
@@ -369,6 +368,22 @@ module Alchemy
       it "should return the content for rss descdefinitionription" do
         element.content_for_rss_description.should == element.contents.find_by_name('body')
       end
+
+      context 'if no content is defined as rss title' do
+        before { element.stub(content_descriptions: []) }
+
+        it "should return nil" do
+          element.content_for_rss_title.should be_nil
+        end
+      end
+
+      context 'if no content is defined as rss description' do
+        before { element.stub(content_descriptions: []) }
+
+        it "should return nil" do
+          element.content_for_rss_description.should be_nil
+        end
+      end
     end
 
     describe '#update_contents' do
@@ -376,7 +391,9 @@ module Alchemy
 
       let(:page)    { build_stubbed(:page) }
       let(:element) { build_stubbed(:element, page: page) }
-      let(:content) { double(:content) }
+      let(:content) { double(:content, id: 1) }
+
+      before { element.stub(:contents).and_return([content]) }
 
       context "with attributes hash is nil" do
         let(:params) { nil }
@@ -384,11 +401,7 @@ module Alchemy
       end
 
       context "with valid attributes hash" do
-        let(:params) { {1 => {body: 'Title'}} }
-
-        before do
-          element.contents.should_receive(:find).with(1).and_return(content)
-        end
+        let(:params) { {"#{content.id}" => {body: 'Title'}} }
 
         context 'with passing validations' do
           before do

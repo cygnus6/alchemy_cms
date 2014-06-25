@@ -203,5 +203,66 @@ module Alchemy
         should have_selector('form input[name="_method"][value="delete"]')
       end
     end
+
+    describe '#alchemy_datepicker' do
+      subject { alchemy_datepicker(essence, :date, {value: now}) }
+
+      let(:essence) { EssenceDate.new() }
+      let(:now)     { Time.now }
+
+      it "renders a date field" do
+        should have_selector("input[type='date']")
+      end
+
+      it "sets default date as value" do
+        should have_selector("input[value='#{::I18n.l(now, format: :datepicker)}']")
+      end
+
+      context 'with date stored on object' do
+        let(:date)    { Time.parse('1976-10-07 00:00 Z') }
+        let(:essence) { EssenceDate.new(date: date) }
+
+        it "sets this date as value" do
+          should have_selector("input[value='#{::I18n.l(date, format: :datepicker)}']")
+        end
+      end
+    end
+
+    describe '#current_alchemy_user_name' do
+      subject { helper.current_alchemy_user_name }
+
+      before { helper.stub(current_alchemy_user: user) }
+
+      context 'with a user having a `alchemy_display_name` method' do
+        let(:user) { double('User', alchemy_display_name: 'Peter Schroeder') }
+
+        it "Returns a span showing the name of the currently logged in user." do
+          should have_content("#{Alchemy::I18n.t('Logged in as')} Peter Schroeder")
+          should have_selector("span.current-user-name")
+        end
+      end
+
+      context 'with a user not having a `alchemy_display_name` method' do
+        let(:user) { double('User', name: 'Peter Schroeder') }
+
+        it { should be_nil }
+      end
+    end
+
+    describe '#link_url_regexp' do
+      subject { helper.link_url_regexp }
+
+      it "returns the regular expression for external link urls" do
+        expect(subject).to be_a(Regexp)
+      end
+
+      context 'if the expression from config is nil' do
+        before { Alchemy::Config.stub(get: {link_url: nil}) }
+
+        it "returns the default expression" do
+          expect(subject).to_not be_nil
+        end
+      end
+    end
   end
 end
