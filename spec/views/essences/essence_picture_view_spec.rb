@@ -8,11 +8,11 @@ describe "essences/_essence_picture_view" do
   before do
     ActionView::Base.send(:include, Alchemy::UrlHelper)
     ActionView::Base.send(:include, Alchemy::EssencesHelper)
-    view.stub(:configuration).and_return(:jpg)
+    allow(view).to receive(:configuration).and_return(:jpg)
   end
 
   context "with caption" do
-    let(:options) { {show_caption: true} }
+    let(:options) { {} }
     let(:html_options) { {} }
 
     subject do
@@ -24,18 +24,64 @@ describe "essences/_essence_picture_view" do
     end
 
     it "should enclose the image in a <figure> element" do
-      should have_selector('figure img')
+      is_expected.to have_selector('figure img')
+    end
+
+    it "should shows the caption" do
+      should have_selector('figure figcaption')
+      should have_content('This is a cute cat')
+    end
+
+    context "but disabled in the options" do
+      let(:options) { {show_caption: false} }
+
+      it "should not enclose the image in a <figure> element" do
+        should_not have_selector('figure img')
+      end
+
+      it "should not show the caption" do
+        should_not have_selector('figure figcaption')
+        should_not have_content('This is a cute cat')
+      end
+    end
+
+    context "but disabled in the content settings" do
+      before do
+        allow(content).to receive(:settings).and_return({show_caption: false})
+      end
+
+      it "should not enclose the image in a <figure> element" do
+        should_not have_selector('figure img')
+      end
+
+      it "should not show the caption" do
+        should_not have_selector('figure figcaption')
+        should_not have_content('This is a cute cat')
+      end
+
+      context 'but enabled in the options hash' do
+        let(:options) { {show_caption: true} }
+
+        it "should enclose the image in a <figure> element" do
+          should have_selector('figure img')
+        end
+
+        it "should shows the caption" do
+          should have_selector('figure figcaption')
+          should have_content('This is a cute cat')
+        end
+      end
     end
 
     context "and essence with css class" do
       before { essence_picture.css_class = 'left' }
 
       it "should have the class on the <figure> element" do
-        should have_selector('figure.left img')
+        is_expected.to have_selector('figure.left img')
       end
 
       it "should not have the class on the <img> element" do
-        should_not have_selector('figure img.left')
+        is_expected.not_to have_selector('figure img.left')
       end
     end
 
@@ -43,15 +89,15 @@ describe "essences/_essence_picture_view" do
       before { html_options[:class] = 'right' }
 
       it "should have the class from the html_options on the <figure> element" do
-        should have_selector('figure.right img')
+        is_expected.to have_selector('figure.right img')
       end
 
       it "should not have the class from the essence on the <figure> element" do
-        should_not have_selector('figure.left img')
+        is_expected.not_to have_selector('figure.left img')
       end
 
       it "should not have the class from the html_options on the <img> element" do
-        should_not have_selector('figure img.right')
+        is_expected.not_to have_selector('figure img.right')
       end
     end
   end
@@ -69,16 +115,15 @@ describe "essences/_essence_picture_view" do
     end
 
     it "should enclose the image in a link tag" do
-      should have_selector('a[href="/home"] img')
+      is_expected.to have_selector('a[href="/home"] img')
     end
 
     context "but disabled link option" do
       before { options[:disable_link] = true }
 
       it "should not enclose the image in a link tag" do
-        should_not have_selector('a img')
+        is_expected.not_to have_selector('a img')
       end
     end
   end
-
 end

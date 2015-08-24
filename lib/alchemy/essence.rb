@@ -24,6 +24,8 @@ module Alchemy #:nodoc:
       #   Specify the column for the preview_text method.
       #
       def acts_as_essence(options={})
+        register_as_essence_association!
+
         configuration = {
           ingredient_column: 'body'
         }.update(options)
@@ -34,14 +36,16 @@ module Alchemy #:nodoc:
           stampable stamper_class_name: Alchemy.user_class_name
           validate :validate_ingredient, :on => :update, :if => 'validations.any?'
 
-          has_one :content, :as => :essence
-          has_one :element, :through => :content
-          has_one :page,    :through => :element
+          has_one :content, :as => :essence, class_name: "Alchemy::Content"
+          has_one :element, :through => :content, class_name: "Alchemy::Element"
+          has_one :page,    :through => :element, class_name: "Alchemy::Page"
 
-          scope :available,    -> { joins(:element).merge(Element.available) }
-          scope :from_element, ->(name) { joins(:element).where(alchemy_elements: { name: name }) }
+          scope :available,    -> { joins(:element).merge(Alchemy::Element.available) }
+          scope :from_element, ->(name) { joins(:element).where(Element.table_name => { name: name }) }
 
-          delegate :public?, to: :element
+          delegate :restricted?, to: :page,    allow_nil: true
+          delegate :trashed?,    to: :element, allow_nil: true
+          delegate :public?,     to: :element, allow_nil: true
 
           after_update :touch_content
 
@@ -63,6 +67,13 @@ module Alchemy #:nodoc:
         EOV
       end
 
+      # Register the current class as has_many association on +Alchemy::Page+ and +Alchemy::Element+ models
+      def register_as_essence_association!
+        klass_name = self.model_name.to_s
+        arguments = [:has_many, klass_name.demodulize.tableize.to_sym, through: :contents,
+          source: :essence, source_type: klass_name]
+        %w(Page Element).each { |k| "Alchemy::#{k}".constantize.send(*arguments) }
+      end
     end
 
     module InstanceMethods
@@ -113,7 +124,9 @@ module Alchemy #:nodoc:
       def validate_ingredient
         validations.each do |validation|
           if validation.respond_to?(:keys)
-            validation.map {|key,value| self.send("validate_#{key}", validation) }
+            validation.map do |key, value|
+              self.send("validate_#{key}", value)
+            end
           else
             self.send("validate_#{validation}")
           end
@@ -128,23 +141,23 @@ module Alchemy #:nodoc:
         @validation_errors ||= []
       end
 
-      def validate_presence
-        if ingredient.blank?
+      def validate_presence(validate = true)
+        if validate && ingredient.blank?
           errors.add(ingredient_column, :blank)
           validation_errors << :blank
         end
       end
 
-      def validate_uniqueness
-        return if !public?
+      def validate_uniqueness(validate = true)
+        return if !validate || !public?
         if duplicates.any?
           errors.add(ingredient_column, :taken)
           validation_errors << :taken
         end
       end
 
-      def validate_format(validation)
-        matcher = Config.get('format_matchers')["#{validation['format']}"] || validation['format']
+      def validate_format(format)
+        matcher = Config.get('format_matchers')[format] || format
         if ingredient.to_s.match(Regexp.new(matcher)).nil?
           errors.add(ingredient_column, :invalid)
           validation_errors << :invalid

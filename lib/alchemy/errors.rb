@@ -13,12 +13,26 @@ module Alchemy
   class DefaultLanguageNotFoundError < StandardError
     # Raised if no default language can be found.
     def message
-      "No default language found. Have you run the rake alchemy:db:seed task?"
+      "No default language found! Please run the `bin/rake db:seed` task."
+    end
+  end
+
+  class DefaultLanguageNotDeletable < StandardError
+    # Raised if one tries to delete the default language.
+    def message
+      "Default language is not deletable!"
     end
   end
 
   class ElementDefinitionError < StandardError
     # Raised if element definition can not be found.
+    def initialize(attributes)
+      @name = attributes[:name]
+    end
+
+    def message
+      "Element definition for #{@name} not found. Please check your elements.yml"
+    end
   end
 
   class EssenceMissingError < StandardError
@@ -32,8 +46,11 @@ module Alchemy
     # Raised if calling +image_file+ on a Picture object returns nil.
   end
 
-  class PageLayoutDefinitionError < StandardError
-    # Raised if page_layout definition can not be found.
+  class NotMountedError < StandardError
+    # Raised if Alchemy is not properly mounted in the apps routes file.
+    def message
+      "Alchemy mount point not found! Please run `bin/rake alchemy:mount'"
+    end
   end
 
   class PictureInUseError < StandardError

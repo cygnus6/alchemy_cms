@@ -1,13 +1,11 @@
-Alchemy::Engine.routes.draw do
+require 'alchemy/routing_constraints'
 
+Alchemy::Engine.routes.draw do
   root :to => 'pages#show'
 
   get '/sitemap.xml' => 'pages#sitemap', format: 'xml'
 
-  get '/admin' => redirect(
-    "#{Alchemy::MountPoint.get}/admin/dashboard"
-  )
-
+  get '/admin' => redirect('admin/dashboard')
   get '/admin/dashboard' => 'admin/dashboard#index',
         :as => :admin_dashboard
   get '/admin/dashboard/info' => 'admin/dashboard#info',
@@ -27,17 +25,32 @@ Alchemy::Engine.routes.draw do
         :as => :show_picture
   get '/pictures/:id/zoom/:name.:format' => 'pictures#zoom',
         :as => :zoom_picture
-  get "/pictures/:id/thumbnails/:size(/:crop)(/:crop_from/:crop_size)/:name.:format" => 'pictures#thumbnail',
+  get "/pictures/:id/thumbnails(/:size)(/:crop)(/:crop_from/:crop_size)/:name.:format" => 'pictures#thumbnail',
         :as => :thumbnail, :defaults => {:format => 'png', :name => "thumbnail"}
 
-  get '/admin/leave' => 'base#leave', :as => :leave_admin
+  get '/admin/leave' => 'admin/base#leave', :as => :leave_admin
 
   resources :messages, :only => [:index, :new, :create]
   resources :elements, :only => :show
-  resources :contents, :only => :show
+
+  namespace :api, defaults: {format: 'json'} do
+    resources :contents, only: [:index, :show]
+
+    resources :elements, only: [:index, :show] do
+      get '/contents' => 'contents#index', as: 'contents'
+      get '/contents/:name' => 'contents#show', as: 'content'
+    end
+
+    resources :pages, only: [:index] do
+      get 'elements' => 'elements#index', as: 'elements'
+      get 'elements/:named' => 'elements#index', as: 'named_elements'
+    end
+
+    get '/pages/*urlname(.:format)' => 'pages#show', as: 'page'
+    get '/admin/pages/:id(.:format)' => 'pages#show', as: 'preview_page'
+  end
 
   namespace :admin do
-
     resources :contents do
       collection do
         post :order
@@ -139,16 +152,16 @@ Alchemy::Engine.routes.draw do
     end
 
     resources :sites
-
   end
 
-  get '/:lang' => 'pages#show',
-      :constraints => {:lang => /[a-z]{2}(-[a-z]{2})?/},
-      :as => :show_language_root
+  get '/:locale' => 'pages#show',
+    constraints: {locale: Alchemy::RoutingConstraints::LOCALE_REGEXP},
+    as: :show_language_root
 
   # The page show action has to be last route
-  get '(/:lang)/*urlname(.:format)' => 'pages#show',
-      :constraints => {:lang => /[a-z]{2}(-[a-z]{2})?/},
-      :as => :show_page
-
+  constraints(locale: Alchemy::RoutingConstraints::LOCALE_REGEXP) do
+    get '(/:locale)/*urlname(.:format)' => 'pages#show',
+      constraints: Alchemy::RoutingConstraints.new,
+      as: :show_page
+  end
 end
