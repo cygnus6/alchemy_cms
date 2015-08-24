@@ -29,7 +29,7 @@ module Alchemy
     acts_as_taggable
 
     # All Elements inside a cell are a list. All Elements not in cell are in the cell_id.nil list.
-    acts_as_list :scope => [:page_id, :cell_id]
+    acts_as_list scope: [:page_id, :cell_id]
     stampable stamper_class_name: Alchemy.user_class_name
 
     has_many :contents, -> { order(:position) }, dependent: :destroy
@@ -37,9 +37,8 @@ module Alchemy
     belongs_to :page
     has_and_belongs_to_many :touchable_pages, -> { uniq },
       class_name: 'Alchemy::Page',
-      join_table: 'alchemy_elements_alchemy_pages'
+      join_table: ElementToPage.table_name
 
-    validates_uniqueness_of :position, :scope => [:page_id, :cell_id], :if => lambda { |e| e.position != nil }
     validates_presence_of :name, :on => :create
     validates_format_of :name, :on => :create, :with => /\A[a-z0-9_-]+\z/
 
@@ -47,17 +46,18 @@ module Alchemy
 
     after_create :create_contents, :unless => proc { |e| e.create_contents_after_create == false }
     after_update :touch_pages
+    after_update :touch_cell, unless: -> { self.cell.nil? }
 
     scope :trashed,           -> { where(position: nil).order('updated_at DESC') }
     scope :not_trashed,       -> { where(Element.arel_table[:position].not_eq(nil)) }
     scope :published,         -> { where(public: true) }
-    scope :not_restricted,    -> { joins(:page).where('alchemy_pages' => {restricted: false}) }
+    scope :not_restricted,    -> { joins(:page).merge(Page.not_restricted) }
     scope :available,         -> { published.not_trashed }
     scope :named,             ->(names) { where(name: names) }
     scope :excluded,          ->(names) { where(arel_table[:name].not_in(names)) }
     scope :not_in_cell,       -> { where(cell_id: nil) }
     scope :in_cell,           -> { where("#{self.table_name}.cell_id IS NOT NULL") }
-    scope :from_current_site, -> { where(alchemy_languages: {site_id: Site.current || Site.default}).joins(page: 'language') }
+    scope :from_current_site, -> { where(Language.table_name => {site_id: Site.current || Site.default}).joins(page: 'language') }
 
     delegate :restricted?, to: :page, allow_nil: true
 
@@ -69,24 +69,32 @@ module Alchemy
     class << self
 
       # Builds a new element as described in +/config/alchemy/elements.yml+
-      def new_from_scratch(attributes)
+      #
+      # - Returns a new Alchemy::Element object if no name is given in attributes,
+      #   because the definition can not be found w/o name
+      # - Raises Alchemy::ElementDefinitionError if no definition for given attributes[:name]
+      #   could be found
+      #
+      def new_from_scratch(attributes = {})
         attributes = attributes.dup.symbolize_keys
+
         return new if attributes[:name].blank?
-        return nil if definitions.blank?
-        # clean the name from cell name
-        attributes[:name] = attributes[:name].split('#').first
-        if element_scratch = definitions.detect { |el| el['name'] == attributes[:name] }
-          new(element_scratch.merge(attributes).except(*FORBIDDEN_DEFINITION_ATTRIBUTES))
-        else
-          raise ElementDefinitionError, "Element definition for #{attributes[:name]} not found. Please check your elements.yml"
-        end
+
+        new_element_from_definition_by(attributes) ||
+          raise(ElementDefinitionError.new(attributes))
       end
 
-      # Builds a new element as described in +/config/alchemy/elements.yml+ and saves it
+      # Creates a new element as described in +/config/alchemy/elements.yml+
+      #
+      # - Returns a new Alchemy::Element object if no name is given in attributes,
+      #   because the definition can not be found w/o name
+      # - Raises Alchemy::ElementDefinitionError if no definition for given attributes[:name]
+      #   could be found
+      #
       def create_from_scratch(attributes)
         element = new_from_scratch(attributes)
         element.save if element
-        return element
+        element
       end
 
       # This methods does a copy of source and all depending contents and all of their depending essences.
@@ -127,6 +135,20 @@ module Alchemy
         }
       end
 
+      private
+
+      def new_element_from_definition_by(attributes)
+        remove_cell_name_from_element_name!(attributes)
+
+        element_scratch = definitions.detect { |el| el['name'] == attributes[:name] }
+        return if element_scratch.nil?
+
+        new(element_scratch.merge(attributes).except(*FORBIDDEN_DEFINITION_ATTRIBUTES))
+      end
+
+      def remove_cell_name_from_element_name!(attributes)
+        attributes[:name] = attributes[:name].split('#').first
+      end
     end
 
     # Returns next public element from same page.
@@ -192,9 +214,7 @@ module Alchemy
     #       rss_title: true
     #
     def content_for_rss_title
-      rss_title = content_descriptions.detect { |c| c['rss_title'] }
-      return if rss_title.blank?
-      contents.find_by_name(rss_title['name'])
+      content_for_rss_meta('title')
     end
 
     # Returns the content that is marked as rss description.
@@ -208,9 +228,7 @@ module Alchemy
     #       rss_description: true
     #
     def content_for_rss_description
-      rss_description = content_descriptions.detect { |c| c['rss_description'] }
-      return if rss_description.blank?
-      contents.find_by_name(rss_description['name'])
+      content_for_rss_meta('description')
     end
 
     # Returns the array with the hashes for all element contents in the elements.yml file
@@ -268,7 +286,8 @@ module Alchemy
     def update_contents(contents_attributes)
       return true if contents_attributes.nil?
       contents.each do |content|
-        content.update_essence(contents_attributes["#{content.id}"]) || errors.add(:base, :essence_validation_failed)
+        content_hash = contents_attributes["#{content.id}"] || next
+        content.update_essence(content_hash) || errors.add(:base, :essence_validation_failed)
       end
       errors.blank?
     end
@@ -360,7 +379,7 @@ module Alchemy
               "fields.#{content_name}.#{error}".to_sym,
               "errors.#{error}".to_sym
             ],
-            field: Content.translated_label_for(content_name)
+            field: Content.translated_label_for(content_name, name)
           )
         end
       end
@@ -383,7 +402,7 @@ module Alchemy
     # Returns an array of all EssenceRichtext contents ids
     #
     def richtext_contents_ids
-      contents.essence_richtexts.pluck('alchemy_contents.id')
+      contents.essence_richtexts.pluck("#{Content.table_name}.id")
     end
 
     # The names of all cells from given page this element could be placed in.
@@ -420,7 +439,27 @@ module Alchemy
       "alchemy/elements/#{name}_view"
     end
 
+    # Returns the key that's taken for cache path.
+    #
+    # Uses the page's +published_at+ value that's updated when the user publishes the page.
+    #
+    # If the page is the current preview it uses the element's updated_at value as cache key.
+    #
+    def cache_key
+      if Page.current_preview == self.page
+        "alchemy/elements/#{id}-#{updated_at}"
+      else
+        "alchemy/elements/#{id}-#{page.published_at}"
+      end
+    end
+
     private
+
+    def content_for_rss_meta(type)
+      description = content_descriptions.detect { |c| c["rss_#{type}"] }
+      return if description.blank?
+      contents.find_by(name: description['name'])
+    end
 
     # creates the contents for this element as described in the elements.yml
     def create_contents
@@ -459,6 +498,15 @@ module Alchemy
     #
     def unique_available_page_cell_names(page)
       available_page_cells(page).collect(&:name).uniq
+    end
+
+    # If element has a +cell+ associated,
+    # it updates it's timestamp.
+    #
+    # Called after_update
+    #
+    def touch_cell
+      self.cell.touch
     end
 
   end

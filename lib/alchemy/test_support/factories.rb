@@ -1,23 +1,22 @@
+require 'factory_girl'
+
 FactoryGirl.define do
 
-  factory :user, class: 'DummyUser' do
+  factory :alchemy_dummy_user, class: 'DummyUser' do
     sequence(:email) { |n| "john.#{n}@doe.com" }
     password 's3cr3t'
+    alchemy_roles ['member']
 
-    factory :admin_user do
-      alchemy_roles 'admin'
+    trait :as_admin do
+      alchemy_roles ['admin']
     end
 
-    factory :member_user do
-      alchemy_roles 'member'
+    trait :as_author do
+      alchemy_roles ['author']
     end
 
-    factory :author_user do
-      alchemy_roles 'author'
-    end
-
-    factory :editor_user do
-      alchemy_roles 'editor'
+    trait :as_editor do
+      alchemy_roles ['editor']
     end
   end
 
@@ -26,7 +25,7 @@ FactoryGirl.define do
     code 'de'
     default true
     frontpage_name 'Intro'
-    page_layout 'intro'
+    page_layout { Alchemy::Config.get(:default_language)['page_layout'] }
     public true
     site { Alchemy::Site.first }
 
@@ -57,7 +56,7 @@ FactoryGirl.define do
 
     factory :language_root_page do
       name 'Startseite'
-      page_layout 'intro'
+      page_layout { language.page_layout }
       language_root true
       public true
       parent_id { Alchemy::Page.root.id }
@@ -134,6 +133,8 @@ FactoryGirl.define do
     hidden_name 'not shown'
     starts_at DateTime.new(2012, 03, 02, 8, 15)
     ends_at DateTime.new(2012, 03, 02, 19, 30)
+    lunch_starts_at DateTime.new(2012, 03, 02, 12, 15)
+    lunch_ends_at DateTime.new(2012, 03, 02, 13, 45)
     description "something\nfancy"
     published false
     entrance_fee 12.3

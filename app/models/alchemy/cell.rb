@@ -19,7 +19,7 @@
 #
 # Render cells with the +render_cell+ helper
 #
-# Views for cells are inside the +app/views/cells+ folder in you project.
+# Views for cells are inside the +app/views/cells+ folder in your project.
 #
 module Alchemy
   class Cell < ActiveRecord::Base
@@ -56,7 +56,7 @@ module Alchemy
     private
 
       def read_yml_file
-        ::YAML.load_file(yml_file_path) || []
+        ::YAML.load(ERB.new(File.read(yml_file_path)).result) || []
       end
 
       def yml_file_path

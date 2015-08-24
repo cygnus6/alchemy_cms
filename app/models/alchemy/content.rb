@@ -25,6 +25,7 @@ module Alchemy
 
     belongs_to :essence, :polymorphic => true, :dependent => :destroy
     belongs_to :element, touch: true
+    has_one :page, through: :element
 
     stampable stamper_class_name: Alchemy.user_class_name
 
@@ -35,9 +36,6 @@ module Alchemy
       # Fixes a bug with postgresql having a wrong element_id value, if element_id is nil.
       "element_id = #{element_id || 'null'} AND essence_type = '#{essence_type}'"
     end
-
-    # Validations
-    validates :position, uniqueness: {scope: [:element_id, :essence_type]}
 
     # Essence scopes
     scope :essence_booleans,  -> { where(essence_type: "Alchemy::EssenceBoolean") }
@@ -51,6 +49,14 @@ module Alchemy
     scope :essence_selects,   -> { where(essence_type: "Alchemy::EssenceSelect") }
     scope :essence_texts,     -> { where(essence_type: "Alchemy::EssenceText") }
     scope :named,             ->(name) { where(name: name) }
+    scope :available,         -> { published.not_trashed }
+    scope :published,         -> { joins(:element).merge(Element.published) }
+    scope :not_trashed,       -> { joins(:element).merge(Element.not_trashed) }
+    scope :not_restricted,    -> { joins(:element).merge(Element.not_restricted) }
+
+    delegate :restricted?, to: :page,    allow_nil: true
+    delegate :trashed?,    to: :element, allow_nil: true
+    delegate :public?,     to: :element, allow_nil: true
 
     class << self
       # Returns the translated label for a content name.
@@ -99,9 +105,7 @@ module Alchemy
     # Settings from the elements.yml definition
     def settings
       return {} if description.blank?
-      @settings ||= description['settings']
-      return {} if @settings.blank?
-      @settings.symbolize_keys
+      @settings ||= description.fetch('settings', {}).symbolize_keys
     end
 
     def siblings
@@ -113,6 +117,25 @@ module Alchemy
     def ingredient
       return nil if essence.nil?
       essence.ingredient
+    end
+
+    # Serialized object representation for json api
+    #
+    def serialize
+      {
+        name: name,
+        value: serialized_ingredient,
+        link: essence.try(:link)
+      }.delete_if { |_k, v| v.blank? }
+    end
+
+    # Ingredient value from essence for json api
+    #
+    # If the essence responds to +serialized_ingredient+ method it takes this
+    # otherwise it uses the ingredient column.
+    #
+    def serialized_ingredient
+      essence.try(:serialized_ingredient) || ingredient
     end
 
     # Sets the ingredient from essence
@@ -184,7 +207,10 @@ module Alchemy
 
     # Returns true if this content should be taken for element preview.
     def preview_content?
-      !!description['take_me_for_preview']
+      if description['take_me_for_preview']
+        ActiveSupport::Deprecation.warn("Content definition's `take_me_for_preview` key is deprecated. Please use `as_element_title` instead.")
+      end
+      !!description['take_me_for_preview'] || !!description['as_element_title']
     end
 
     # Proxy method that returns the preview text from essence.

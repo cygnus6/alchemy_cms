@@ -1,14 +1,14 @@
 // Alchemy CMS Sprockets Manifest
 // ------------------------------
-//= require jquery
+//= require jquery2
 //= require jquery_ujs
 //= require turbolinks
-//= require jquery.ui.datepicker
-//= require jquery.ui.draggable
-//= require jquery.ui.effect-drop
-//= require jquery.ui.effect-fade
-//= require jquery.ui.sortable
-//= require jquery.ui.tabs
+//= require jquery-ui/datepicker
+//= require jquery-ui/draggable
+//= require jquery-ui/effect-drop
+//= require jquery-ui/effect-fade
+//= require jquery-ui/sortable
+//= require jquery-ui/tabs
 //= require tinymce/tinymce.min
 //= require_tree ../../../../vendor/assets/javascripts/jquery_plugins/
 //= require spin.min
@@ -16,6 +16,10 @@
 //= require requestAnimationFrame
 //= require select2
 //= require select2_locale_de
+//= require select2_locale_es
+//= require select2_locale_fr
+//= require select2_locale_nl
+//= require select2_locale_ru
 //= require alchemy/alchemy.base
 //= require alchemy/alchemy.autocomplete
 //= require alchemy/alchemy.browser

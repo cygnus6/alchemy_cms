@@ -36,10 +36,17 @@ module Alchemy
     module GuestUser
       def alchemy_guest_user_rules
         can([:show, :download], Alchemy::Attachment) { |a| !a.restricted? }
-        can :show,              Alchemy::Element,    public: true, page: { restricted: false }
-        can :show,              Alchemy::Page,       restricted: false, public: true
+        can :read,              Alchemy::Content,    Alchemy::Content.available.not_restricted do |c|
+          c.public? && !c.restricted? && !c.trashed?
+        end
+        can :read,              Alchemy::Element,    Alchemy::Element.available.not_restricted do |e|
+          e.public? && !e.restricted? && !e.trashed?
+        end
+        can :read,              Alchemy::Page,       Alchemy::Page.published.not_restricted do |p|
+          p.public? && !p.restricted?
+        end
         can :see,               Alchemy::Page,       restricted: false, visible: true
-        can([:show, :download], Alchemy::Picture)    { |p| !p.restricted? }
+        can(:display,           Alchemy::Picture)    { |p| !p.restricted? }
       end
     end
 
@@ -55,10 +62,17 @@ module Alchemy
 
         # Resources
         can [:show, :download], Alchemy::Attachment
-        can :show,              Alchemy::Element,   public: true, page: { restricted: true }
-        can :show,              Alchemy::Page,      public: true
+        can :read,              Alchemy::Content,   Alchemy::Content.available do |c|
+          c.public? && !c.trashed?
+        end
+        can :read,              Alchemy::Element,   Alchemy::Element.available do |e|
+          e.public? && !e.trashed?
+        end
+        can :read,              Alchemy::Page,      Alchemy::Page.published do |p|
+          p.public?
+        end
         can :see,               Alchemy::Page,      restricted: true, visible: true
-        can [:show, :download], Alchemy::Picture
+        can :display,           Alchemy::Picture
         can [:read, :update],   Alchemy.user_class, id: @user.id
       end
     end
@@ -85,21 +99,22 @@ module Alchemy
         ]
 
         # Controller actions
-        can [:info, :help],             :alchemy_admin_dashboard
-        can :manage,                    :alchemy_admin_clipboard
-        can :index,                     :trash
-        can :edit,                      :alchemy_admin_layoutpages
+        can :leave,                 :alchemy_admin
+        can [:info, :help],         :alchemy_admin_dashboard
+        can :manage,                :alchemy_admin_clipboard
+        can :index,                 :trash
+        can :edit,                  :alchemy_admin_layoutpages
 
         # Resources
-        can [:read, :download],         Alchemy::Attachment
-        can :manage,                    Alchemy::Content
-        can :manage,                    Alchemy::Element
-        can :manage,                    Alchemy::EssenceFile
-        can :manage,                    Alchemy::EssencePicture
-        can :manage,                    Alchemy::LegacyPageUrl
-        can :edit_content,              Alchemy::Page
-        can [:read, :thumbnail, :info], Alchemy::Picture
-        can [:read, :autocomplete],     Alchemy::Tag
+        can [:read, :download],     Alchemy::Attachment
+        can :manage,                Alchemy::Content
+        can :manage,                Alchemy::Element
+        can :manage,                Alchemy::EssenceFile
+        can :manage,                Alchemy::EssencePicture
+        can :manage,                Alchemy::LegacyPageUrl
+        can :edit_content,          Alchemy::Page
+        can [:read, :info],         Alchemy::Picture
+        can [:read, :autocomplete], Alchemy::Tag
       end
     end
 
@@ -130,6 +145,7 @@ module Alchemy
           :destroy,
           :flush,
           :order,
+          :publish,
           :sort,
           :switch_language
         ], Alchemy::Page
@@ -166,9 +182,9 @@ module Alchemy
     private
 
     def user_role_rules
-      return [] if @user.alchemy_roles.nil?
+      return alchemy_guest_user_rules if @user.alchemy_roles.blank?
       @user.alchemy_roles.each do |role|
-        exec_role_rules(role) if @user.alchemy_roles.include?(role)
+        exec_role_rules(role)
       end
     end
 
@@ -182,12 +198,16 @@ module Alchemy
         :fold,
         :info,
         :link,
-        :publish,
         :read,
         :update,
         :unlock,
         :visit,
         to: :edit_content
+
+      alias_action :show,
+        :thumbnail,
+        :zoom,
+        to: :display
     end
 
     # Include the role specific permissions.

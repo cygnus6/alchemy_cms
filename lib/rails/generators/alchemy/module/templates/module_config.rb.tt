@@ -1,0 +1,17 @@
+Alchemy::Modules.register_module({
+  name: '<%= @module_name %>',
+  order: 1,
+  navigation: {
+    name: 'modules.<%= @module_name %>',
+    controller: '/admin/<%= @module_name %>',
+    action: 'index',
+    image: 'alchemy/<%= @module_name %>_module.png',
+    sub_navigation: [{
+      name: 'modules.<%= @module_name %>',
+      controller: '/admin/<%= @module_name %>',
+      action: 'index'
+    }]
+  }
+})
+
+Alchemy.register_ability(<%= @class_name %>Ability)

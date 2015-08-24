@@ -293,22 +293,87 @@ class AlchemyTwoPointSix < ActiveRecord::Migration
       add_index "alchemy_sites", ["host", "public"], name: "alchemy_sites_public_hosts_idx"
       add_index "alchemy_sites", ["host"], name: "index_alchemy_sites_on_host"
     end
+  end
 
-    unless table_exists?('taggings')
-      create_table "taggings" do |t|
-        t.integer  "tag_id"
-        t.integer  "taggable_id"
-        t.string   "taggable_type"
-        t.integer  "tagger_id"
-        t.string   "tagger_type"
-        t.string   "context"
-        t.datetime "created_at"
-      end
-      add_index "taggings", ["tag_id"], name: "index_taggings_on_tag_id"
-      add_index "taggings", ["taggable_id", "taggable_type", "context"], name: "index_taggings_on_taggable_id_and_taggable_type_and_context"
-      create_table "tags" do |t|
-        t.string "name"
-      end
+  def down
+    if table_exists?('alchemy_attachments')
+      drop_table "alchemy_attachments"
+    end
+
+    if table_exists?('alchemy_cells')
+      drop_table "alchemy_cells"
+    end
+
+    if table_exists?('alchemy_contents')
+      drop_table "alchemy_contents"
+    end
+
+    if table_exists?('alchemy_elements')
+      drop_table "alchemy_elements"
+    end
+
+    if table_exists?('alchemy_elements_alchemy_pages')
+      drop_table "alchemy_elements_alchemy_pages"
+    end
+
+    if table_exists?('alchemy_essence_booleans')
+      drop_table "alchemy_essence_booleans"
+    end
+
+    if table_exists?('alchemy_essence_dates')
+      drop_table "alchemy_essence_dates"
+    end
+
+    if table_exists?('alchemy_essence_files')
+      drop_table "alchemy_essence_files"
+    end
+
+    if table_exists?('alchemy_essence_htmls')
+      drop_table "alchemy_essence_htmls"
+    end
+
+    if table_exists?('alchemy_essence_links')
+      drop_table "alchemy_essence_links"
+    end
+
+    if table_exists?('alchemy_essence_pictures')
+      drop_table "alchemy_essence_pictures"
+    end
+
+    if table_exists?('alchemy_essence_richtexts')
+      drop_table "alchemy_essence_richtexts"
+    end
+
+    if table_exists?('alchemy_essence_selects')
+      drop_table "alchemy_essence_selects"
+    end
+
+    if table_exists?('alchemy_essence_texts')
+      drop_table "alchemy_essence_texts"
+    end
+
+    if table_exists?('alchemy_folded_pages')
+      drop_table "alchemy_folded_pages"
+    end
+
+    if table_exists?('alchemy_languages')
+      drop_table "alchemy_languages"
+    end
+
+    if table_exists?('alchemy_legacy_page_urls')
+      drop_table "alchemy_legacy_page_urls"
+    end
+
+    if table_exists?('alchemy_pages')
+      drop_table "alchemy_pages"
+    end
+
+    if table_exists?('alchemy_pictures')
+      drop_table "alchemy_pictures"
+    end
+
+    if table_exists?('alchemy_sites')
+      drop_table "alchemy_sites"
     end
 
   end

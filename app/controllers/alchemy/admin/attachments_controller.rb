@@ -5,7 +5,15 @@ module Alchemy
 
       def index
         @attachments = Attachment.all
-        @attachments = @attachments.tagged_with(params[:tagged_with]) if params[:tagged_with].present?
+        if params[:only].present?
+          @attachments = @attachments.where("file_mime_type LIKE '%#{params[:only]}%'")
+        end
+        if params[:except].present?
+          @attachments = @attachments.where("file_mime_type NOT LIKE '%#{params[:except]}%'")
+        end
+        if params[:tagged_with].present?
+          @attachments = @attachments.tagged_with(params[:tagged_with])
+        end
         @attachments = @attachments.find_paginated(params, 15, sort_order)
         @options = options_from_params
         if in_overlay?
@@ -40,7 +48,6 @@ module Alchemy
       end
 
       def update
-        @attachment = Attachment.find(params[:id])
         @attachment.update_attributes(attachment_attributes)
         render_errors_or_redirect(
           @attachment,
@@ -50,7 +57,6 @@ module Alchemy
       end
 
       def destroy
-        @attachment = Attachment.find(params[:id])
         name = @attachment.name
         @attachment.destroy
         @url = admin_attachments_url(
@@ -76,7 +82,7 @@ module Alchemy
       end
 
       def archive_overlay
-        @content = Content.select('id').find_by(id: params[:content_id])
+        @content = Content.find_by(id: params[:content_id])
         @options = options_from_params
         respond_to do |format|
           format.html { render partial: 'archive_overlay' }
@@ -90,7 +96,7 @@ module Alchemy
 
       def set_instance_variables
         @while_assigning = true
-        @content = Content.select('id').find_by(id: params[:content_id])
+        @content = Content.find_by(id: params[:content_id])
         @swap = params[:swap]
         @options = options_from_params
       end
