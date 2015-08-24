@@ -1,34 +1,28 @@
 module Alchemy
   class PagesController < Alchemy::BaseController
-    # We need to include this helper because we need the breadcrumb method.
-    # And we cannot define the breadcrump method as helper_method, because rspec does not see helper_methods.
-    # Not the best solution, but's working.
-    # Anyone with a better idea please provide a patch.
-    include Alchemy::BaseHelper
 
-    rescue_from ActionController::RoutingError, :with => :render_404
-
-    before_filter :enforce_primary_host_for_site
-    before_filter :render_page_or_redirect, :only => [:show]
-    before_filter :load_page
-    authorize_resource only: 'show'
+    before_action :enforce_primary_host_for_site
+    before_action :render_page_or_redirect, only: [:show]
 
     # Showing page from params[:urlname]
     #
     def show
+      authorize! :show, @page
+
       if render_fresh_page?
         respond_to do |format|
           format.html { render layout: !request.xhr? }
           format.rss do
             if @page.contains_feed?
-              render action: 'show', layout: false, handlers: [:builder]
+              render layout: false, handlers: [:builder]
             else
               render xml: {error: 'Not found'}, status: 404
             end
           end
-          format.json { render json: @page }
         end
       end
+    rescue ActionController::UnknownFormat
+      page_not_found!
     end
 
     # Renders a search engine compatible xml sitemap.
@@ -51,7 +45,7 @@ module Alchemy
         Page.contentpages.where(
           urlname:       params[:urlname],
           language_id:   Language.current.id,
-          language_code: params[:lang] || Language.current.code
+          language_code: params[:locale] || Language.current.code
         ).first
       else
         # No urlname was given, so just load the language root for the
@@ -74,22 +68,24 @@ module Alchemy
 
     def render_page_or_redirect
       @page ||= load_page
+
       if signup_required?
-        redirect_to signup_path
-      elsif @page.nil? && last_legacy_url
+        redirect_to Alchemy.signup_path
+      elsif (@page.nil? || request.format.nil?) && last_legacy_url
         @page = last_legacy_url.page
-        redirect_page
+        # This drops the given query string.
+        redirect_legacy_page
       elsif @page.blank?
-        raise_not_found_error
-      elsif multi_language? && params[:lang].blank?
-        redirect_page(lang: Language.current.code)
-      elsif multi_language? && params[:urlname].blank? && !params[:lang].blank? && configuration(:redirect_index)
-        redirect_page(lang: params[:lang])
+        page_not_found!
+      elsif multi_language? && params[:locale].blank?
+        redirect_page(locale: Language.current.code)
+      elsif multi_language? && params[:urlname].blank? && !params[:locale].blank? && configuration(:redirect_index)
+        redirect_page(locale: params[:locale])
       elsif configuration(:redirect_to_public_child) && !@page.public?
         redirect_to_public_child
       elsif params[:urlname].blank? && configuration(:redirect_index)
         redirect_page
-      elsif !multi_language? && !params[:lang].blank?
+      elsif !multi_language? && !params[:locale].blank?
         redirect_page
       elsif @page.has_controller?
         redirect_to main_app.url_for(@page.controller_and_action)
@@ -112,30 +108,47 @@ module Alchemy
 
     def redirect_to_public_child
       @page = @page.self_and_descendants.published.not_restricted.first
-      if @page
-        redirect_page
-      else
-        raise_not_found_error
-      end
+      @page ? redirect_page : page_not_found!
     end
 
-    def redirect_page(options={})
+    # Redirects page to given url with 301 status while keeping all additional params
+    def redirect_page(options = {})
+      options = {
+        locale: (multi_language? ? @page.language_code : nil),
+        urlname: @page.urlname
+      }.merge(options)
+
+      redirect_to show_page_path(additional_params.merge(options)), status: 301
+    end
+
+    # Use the bare minimum to redirect to @page
+    # Don't use query string of legacy urlname
+    def redirect_legacy_page(options={})
       defaults = {
-        :lang => (multi_language? ? @page.language_code : nil),
-        :urlname => @page.urlname
+        locale: (multi_language? ? @page.language_code : nil),
+        urlname: @page.urlname
       }
       options = defaults.merge(options)
-      redirect_to show_page_path(additional_params.merge(options)), :status => 301
+      redirect_to show_page_path(options), status: 301
     end
 
+    # Returns url parameters that are not internal show page params.
+    #
+    # * action
+    # * controller
+    # * urlname
+    # * locale
+    #
     def additional_params
-      params.each do |key, value|
-        params[key] = nil if ["action", "controller", "urlname", "lang"].include?(key)
+      params.symbolize_keys.delete_if do |key, _|
+        [:action, :controller, :urlname, :locale].include?(key)
       end
     end
 
     def legacy_urls
-      LegacyPageUrl.joins(:page).where(urlname: params[:urlname], alchemy_pages: {language_id: Language.current.id})
+      # /slug/tree => slug/tree
+      urlname = (request.fullpath[1..-1] if request.fullpath[0] == '/') || request.fullpath
+      LegacyPageUrl.joins(:page).where(urlname: urlname, Page.table_name => {language_id: Language.current.id})
     end
 
     def last_legacy_url
@@ -163,7 +176,9 @@ module Alchemy
     # @returns Boolean
     #
     def cache_page?
-      return false unless @page && Alchemy::Config.get(:cache_pages)
+      return false if @page.nil? ||
+        !Rails.application.config.action_controller.perform_caching ||
+        !Alchemy::Config.get(:cache_pages)
       page_layout = PageLayout.get(@page.page_layout)
       page_layout['cache'] != false && page_layout['searchresults'] != true
     end
@@ -189,5 +204,8 @@ module Alchemy
         public: !@page.restricted)
     end
 
+    def page_not_found!
+      not_found_error!("Alchemy::Page not found \"#{request.fullpath}\"")
+    end
   end
 end

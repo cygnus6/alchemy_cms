@@ -12,9 +12,11 @@ module Alchemy
       before_action :set_root_page,
         only: [:index, :show, :sort, :order]
 
-      authorize_resource class: Alchemy::Page
+      authorize_resource class: Alchemy::Page, except: :index
 
       def index
+        authorize! :index, :alchemy_admin_pages
+
         @locked_pages = Page.from_current_site.all_locked_by(current_alchemy_user)
         @languages = Language.all
         if !@page_root
@@ -151,7 +153,7 @@ module Alchemy
 
       def visit
         @page.unlock!
-        redirect_to show_page_path(:urlname => @page.urlname, :lang => multi_language? ? @page.language_code : nil)
+        redirect_to show_page_path(urlname: @page.urlname, locale: multi_language? ? @page.language_code : nil)
       end
 
       # Sets the page public and updates the published_at attribute that is used as cache_key

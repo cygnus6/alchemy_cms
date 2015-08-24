@@ -13,7 +13,6 @@ module Alchemy
     #
     # * html
     # * js (Tries to replace a given +container_id+ with the elements view partial content via jQuery.)
-    # * json (A JSON object that includes all contents and their ingredients)
     #
     def show
       @page = @element.page
@@ -21,10 +20,8 @@ module Alchemy
 
       respond_to do |format|
         format.html
-        format.js   { @container_id = params[:container_id] }
-        format.json { render json: @element }
+        format.js { @container_id = params[:container_id] }
       end
     end
-
   end
 end

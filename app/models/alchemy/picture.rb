@@ -22,6 +22,7 @@ module Alchemy
     include Alchemy::NameConversions
     include Alchemy::Touching
     include Alchemy::Picture::Sweeping
+    include Alchemy::Picture::Transformations
 
     has_many :essence_pictures, class_name: 'Alchemy::EssencePicture', foreign_key: 'picture_id'
     has_many :contents, through: :essence_pictures
@@ -39,9 +40,13 @@ module Alchemy
       raise PictureInUseError, I18n.t(:cannot_delete_picture_notice) % { name: name }
     end
 
+    # Enables Dragonfly image processing
     dragonfly_accessor :image_file, app: :alchemy_pictures do
-      if Config.get(:preprocess_image_resize).present?
-        after_assign { |a| a.process!(:resize, "#{Config.get(:preprocess_image_resize)}>") }
+      # Preprocess after uploading the picture
+      after_assign do |p|
+        if Config.get(:preprocess_image_resize).present?
+          p.thumb!("#{Config.get(:preprocess_image_resize)}>")
+        end
       end
     end
 
@@ -57,10 +62,21 @@ module Alchemy
 
     stampable stamper_class_name: Alchemy.user_class_name
 
-    scope :named,       ->(name) { where("name LIKE ?", "%#{name}%") }
-    scope :recent,      -> { where("#{self.table_name}.created_at > ?", Time.now - 24.hours).order(:created_at) }
-    scope :deletable,   -> { where('alchemy_pictures.id NOT IN (SELECT picture_id FROM alchemy_essence_pictures)') }
-    scope :without_tag, -> { where("cached_tag_list IS NULL OR cached_tag_list = ''") }
+    scope :named, ->(name) {
+      where("#{self.table_name}.name LIKE ?", "%#{name}%")
+    }
+
+    scope :recent, -> {
+      where("#{self.table_name}.created_at > ?", Time.now - 24.hours).order(:created_at)
+    }
+
+    scope :deletable, -> {
+      where("#{table_name}.id NOT IN (SELECT picture_id FROM #{EssencePicture.table_name})")
+    }
+
+    scope :without_tag, -> {
+      where("#{self.table_name}.cached_tag_list IS NULL OR #{self.table_name}.cached_tag_list = ''")
+    }
 
     after_update :touch_contents
 
@@ -68,8 +84,21 @@ module Alchemy
 
     class << self
 
+      # Returns filtered, paginated and ordered picture collection.
       def find_paginated(params, per_page)
-        Picture.named(params[:query]).page(params[:page] || 1).per(per_page).order(:name)
+        @pictures = Picture.all
+
+        if params[:tagged_with].present?
+          @pictures = @pictures.tagged_with(params[:tagged_with])
+        end
+        if params[:filter].present?
+          @pictures = @pictures.filtered_by(params[:filter])
+        end
+        if params[:query].present?
+          @pictures = @pictures.named(params[:query])
+        end
+
+        @pictures.page(params[:page] || 1).per(per_page).order(:name)
       end
 
       def last_upload
@@ -87,7 +116,6 @@ module Alchemy
           all
         end
       end
-
     end
 
     # Instance methods
@@ -137,80 +165,6 @@ module Alchemy
     def humanized_name
       return "" if image_file_name.blank?
       convert_to_humanized_name(image_file_name, suffix)
-    end
-
-    # Returns true if picture's width is greater than it's height
-    #
-    def landscape_format?
-      image_file.landscape?
-    end
-    alias_method :landscape?, :landscape_format?
-
-    # Returns true if picture's width is smaller than it's height
-    #
-    def portrait_format?
-      image_file.portrait?
-    end
-    alias_method :portrait?, :portrait_format?
-
-    # Returns true if picture's width and height is equal
-    #
-    def square_format?
-      image_file.aspect_ratio == 1.0
-    end
-    alias_method :square?, :square_format?
-
-    # Returns the default centered image mask for a given size.
-    #
-    def default_mask(size)
-      raise "No size given" if size.blank?
-      width = size.split('x')[0].to_i
-      height = size.split('x')[1].to_i
-      if (width > height)
-        zoom_factor = image_file_width.to_f / width
-        mask_height = (height * zoom_factor).round
-        x1 = 0
-        x2 = image_file_width
-        y1 = (image_file_height - mask_height) / 2
-        y2 = y1 + mask_height
-      elsif (width == 0 && height == 0)
-        x1 = 0
-        x2 = image_file_width
-        y1 = 0
-        y2 = image_file_height
-      else
-        zoom_factor = image_file_height.to_f / height
-        mask_width = (width * zoom_factor).round
-        x1 = (image_file_width - mask_width) / 2
-        x2 = x1 + mask_width
-        y1 = 0
-        y2 = image_file_height
-      end
-      {
-        x1: x1,
-        y1: y1,
-        x2: x2,
-        y2: y2
-      }
-    end
-
-    # Returns a size value String for the thumbnail used in essence picture editors.
-    #
-    def cropped_thumbnail_size(size)
-      return "111x93" if size == "111x93" || size.blank?
-      x = size.split('x')[0].to_i
-      y = size.split('x')[1].to_i
-      return "111x93" if x.zero? || y.zero?
-      if (x > y)
-        zoom_factor = 111.0 / x
-        new_x = 111
-        new_y = y * zoom_factor
-      else
-        zoom_factor = 93.0 / y
-        new_x = x * zoom_factor
-        new_y = 93
-      end
-      "#{new_x.round}x#{new_y.round}"
     end
 
     # Checks if the picture is restricted.

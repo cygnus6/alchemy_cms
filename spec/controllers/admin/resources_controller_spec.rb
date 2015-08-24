@@ -1,11 +1,11 @@
 require "spec_helper"
 
-class EventsController < Alchemy::Admin::ResourcesController
+class Admin::EventsController < Alchemy::Admin::ResourcesController
 end
 
-describe EventsController do
+describe Admin::EventsController do
   it "should include ResourcesHelper" do
-    controller.respond_to?(:resource_window_size).should be_true
+    expect(controller.respond_to?(:resource_window_size)).to be_truthy
   end
 
   describe '#index' do
@@ -14,14 +14,14 @@ describe EventsController do
     let(:lustig) { Event.create(name: 'Lustig') }
 
     before do
-      sign_in(admin_user)
+      authorize_user(:as_admin)
       peter; lustig
     end
 
     it "returns all records" do
       get :index, params
-      assigns(:events).should include(peter)
-      assigns(:events).should include(lustig)
+      expect(assigns(:events)).to include(peter)
+      expect(assigns(:events)).to include(lustig)
     end
 
     context 'with search query given' do
@@ -29,8 +29,24 @@ describe EventsController do
 
       it "returns only matching records" do
         get :index, params
-        assigns(:events).should include(peter)
-        assigns(:events).should_not include(lustig)
+        expect(assigns(:events)).to include(peter)
+        expect(assigns(:events)).not_to include(lustig)
+      end
+
+      context "but searching for record with certain association" do
+        let(:bauwagen) { Location.create(name: 'Bauwagen') }
+        let(:params)   { {query: 'Bauwagen'} }
+
+        before do
+          peter.location = bauwagen
+          peter.save
+        end
+
+        it "returns only matching records" do
+          get :index, params
+          expect(assigns(:events)).to include(peter)
+          expect(assigns(:events)).not_to include(lustig)
+        end
       end
     end
   end

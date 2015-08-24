@@ -12,6 +12,8 @@ require 'jquery-rails'
 require 'jquery-ui-rails'
 require 'kaminari'
 require 'non-stupid-digest-assets'
+require 'request_store'
+require 'responders'
 require 'sass-rails'
 require 'sassy-buttons'
 require 'simple_form'
@@ -23,6 +25,7 @@ require 'userstamp'
 require_relative './auth_accessors'
 require_relative './cache_digests/template_tracker'
 require_relative './config'
+require_relative './configuration_methods'
 require_relative './controller_actions'
 require_relative './errors'
 require_relative './essence'
@@ -35,16 +38,17 @@ require_relative './logger'
 require_relative './modules'
 require_relative './mount_point'
 require_relative './name_conversions'
+require_relative './on_page_layout'
 require_relative './page_layout'
 require_relative './permissions'
 require_relative './picture_attributes'
+require_relative './ssl_protection'
 require_relative './resource'
 require_relative './tinymce'
 require_relative './touching'
 
 # Require hacks
 require_relative './kaminari/scoped_pagination_url_helper'
-require_relative '../extensions/action_view'
 
 # Middleware
 require_relative './middleware/rescue_old_cookies'
@@ -79,17 +83,22 @@ module Alchemy
     end
 
     initializer 'alchemy.non_digest_assets' do |app|
-      NonStupidDigestAssets.whitelist = [/^tinymce\//]
+      NonStupidDigestAssets.whitelist += [/^tinymce\//]
+    end
+
+    # We need to require each essence class in development mode,
+    # so it can register itself as essence relation on Page and Element models
+    # @see lib/alchemy/essence.rb:71
+    initializer 'alchemy.load_essence_classes' do |app|
+      unless Rails.application.config.cache_classes
+        Dir.glob(File.join(File.dirname(__FILE__), '../../app/models/alchemy/essence_*.rb')).each do |essence|
+          require essence
+        end
+      end
     end
 
     config.after_initialize do
       require_relative './userstamp'
-    end
-
-    config.to_prepare do
-      # In order to have Alchemy's helpers and basic controller methods
-      # available in the host app, we patch the ApplicationController.
-      ApplicationController.send(:include, Alchemy::ControllerActions)
     end
   end
 end

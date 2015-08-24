@@ -36,6 +36,7 @@
 module Alchemy
   class Page < ActiveRecord::Base
     include Alchemy::Hints
+    include Alchemy::Logger
     include Alchemy::Touching
 
     DEFAULT_ATTRIBUTES_FOR_COPY = {
@@ -84,6 +85,7 @@ module Alchemy
     before_save :set_language_code, if: -> { language.present? }, unless: :systempage?
     before_save :set_restrictions_to_child_pages, if: :restricted_changed?, unless: :systempage?
     before_save :inherit_restricted_status, if: -> { parent && parent.restricted? }, unless: :systempage?
+    before_save :update_published_at, if: -> { public && read_attribute(:published_at).nil? }, unless: :systempage?
     before_create :set_language_from_parent_or_default, if: -> { language_id.blank? }, unless: :systempage?
     after_update :create_legacy_url, if: :urlname_changed?, unless: :redirects_to_external?
 
@@ -104,13 +106,13 @@ module Alchemy
       # Used to store the current page previewed in the edit page template.
       #
       def current_preview=(page)
-        Thread.current[:alchemy_current_preview] = page
+        RequestStore.store[:alchemy_current_preview] = page
       end
 
       # Returns the current page previewed in the edit page template.
       #
       def current_preview
-        Thread.current[:alchemy_current_preview]
+        RequestStore.store[:alchemy_current_preview]
       end
 
       # @return the language root page for given language id.
@@ -197,7 +199,14 @@ module Alchemy
         options
       end
 
-    private
+      # Returns an array of all pages in the same branch from current.
+      # I.e. used to find the active page in navigation.
+      def ancestors_for(current)
+        return [] if current.nil?
+        current.self_and_ancestors.contentpages
+      end
+
+      private
 
       # Aggregates the attributes from given source for copy of page.
       #
@@ -390,6 +399,10 @@ module Alchemy
     # Stores the old urlname in a LegacyPageUrl
     def create_legacy_url
       legacy_urls.find_or_create_by(urlname: urlname_was)
+    end
+
+    def update_published_at
+      self.published_at = Time.now
     end
 
   end

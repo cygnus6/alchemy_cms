@@ -9,9 +9,9 @@ module Alchemy
     let(:language)      { Language.default }
     let(:klingonian)    { FactoryGirl.create(:klingonian) }
     let(:language_root) { FactoryGirl.create(:language_root_page) }
-    let(:page)          { mock_model(Page, :page_layout => 'foo') }
+    let(:page)          { mock_model(Page, page_layout: 'foo') }
     let(:public_page)   { FactoryGirl.create(:public_page) }
-    let(:news_page)     { FactoryGirl.create(:public_page, :page_layout => 'news', :do_not_autogenerate => false) }
+    let(:news_page)     { FactoryGirl.create(:public_page, page_layout: 'news', do_not_autogenerate: false) }
 
 
     # Validations
@@ -27,20 +27,22 @@ module Alchemy
 
           it "it should be possible to save." do
             contentpage.urlname = "existing_twice"
-            contentpage.should be_valid
+            expect(contentpage).to be_valid
           end
         end
 
         it "should validate the page_layout" do
           contentpage.page_layout = nil
-          contentpage.should_not be_valid
-          contentpage.should have(1).error_on(:page_layout)
+          expect(contentpage).not_to be_valid
+          contentpage.valid?
+          expect(contentpage.errors[:page_layout].size).to eq(1)
         end
 
         it "should validate the parent_id" do
           contentpage.parent_id = nil
-          contentpage.should_not be_valid
-          contentpage.should have(1).error_on(:parent_id)
+          expect(contentpage).not_to be_valid
+          contentpage.valid?
+          expect(contentpage.errors[:parent_id].size).to eq(1)
         end
 
         context 'with page having same urlname' do
@@ -48,27 +50,27 @@ module Alchemy
 
           it "should not be valid" do
             contentpage.urlname = 'existing_twice'
-            contentpage.should_not be_valid
+            expect(contentpage).not_to be_valid
           end
         end
 
         context "with url_nesting set to true" do
-          let(:other_parent) { FactoryGirl.create(:page, parent_id: Page.root.id) }
+          let(:other_parent) { create(:page, parent_id: Page.root.id, visible: true) }
 
           before do
-            Config.stub(:get).and_return(true)
+            allow(Config).to receive(:get).and_return(true)
             with_same_urlname
           end
 
           it "should only validate urlname dependent of parent" do
             contentpage.urlname = 'existing_twice'
             contentpage.parent_id = other_parent.id
-            contentpage.should be_valid
+            expect(contentpage).to be_valid
           end
 
           it "should validate urlname dependent of parent" do
             contentpage.urlname = 'existing_twice'
-            contentpage.should_not be_valid
+            expect(contentpage).not_to be_valid
           end
         end
       end
@@ -81,7 +83,7 @@ module Alchemy
         end
 
         it "should be valid" do
-          rootpage.should be_valid
+          expect(rootpage).to be_valid
         end
       end
 
@@ -89,7 +91,7 @@ module Alchemy
         let(:systempage) { build(:systempage) }
 
         it "should not validate the page_layout" do
-          systempage.should be_valid
+          expect(systempage).to be_valid
         end
       end
 
@@ -129,20 +131,20 @@ module Alchemy
 
     context 'callbacks' do
       let(:page) do
-        FactoryGirl.create(:page, :name => 'My Testpage', :language => language, :parent_id => language_root.id)
+        FactoryGirl.create(:page, name: 'My Testpage', language: language, parent_id: language_root.id)
       end
 
       context 'before_save' do
         it "should not set the title automatically if the name changed but title is not blank" do
           page.name = "My Renaming Test"
           page.save; page.reload
-          page.title.should == "My Testpage"
+          expect(page.title).to eq("My Testpage")
         end
 
         it "should not automatically set the title if it changed its value" do
           page.title = "I like SEO"
           page.save; page.reload
-          page.title.should == "I like SEO"
+          expect(page.title).to eq("I like SEO")
         end
       end
 
@@ -151,15 +153,15 @@ module Alchemy
           it "should store legacy url if page is not redirect to external page" do
             page.urlname = 'new-urlname'
             page.save!
-            page.legacy_urls.should_not be_empty
-            page.legacy_urls.first.urlname.should == 'my-testpage'
+            expect(page.legacy_urls).not_to be_empty
+            expect(page.legacy_urls.first.urlname).to eq('my-testpage')
           end
 
           it "should not store legacy url if page is redirect to external page" do
             page.urlname = 'new-urlname'
             page.page_layout = "external"
             page.save!
-            page.legacy_urls.should be_empty
+            expect(page.legacy_urls).to be_empty
           end
 
           it "should not store legacy url twice for same urlname" do
@@ -169,7 +171,7 @@ module Alchemy
             page.save!
             page.urlname = 'another-urlname'
             page.save!
-            page.legacy_urls.select { |u| u.urlname == 'my-testpage' }.size.should == 1
+            expect(page.legacy_urls.select { |u| u.urlname == 'my-testpage' }.size).to eq(1)
           end
         end
 
@@ -177,7 +179,29 @@ module Alchemy
           it "should not store a legacy url" do
             page.urlname = 'my-testpage'
             page.save!
-            page.legacy_urls.should be_empty
+            expect(page.legacy_urls).to be_empty
+          end
+        end
+
+        context "public has changed" do
+          it "should update published_at" do
+            expect {
+              page.update_attributes!(public: true)
+            }.to change {page.read_attribute(:published_at) }
+          end
+
+          it "should not update already set published_at" do
+            page.update_attributes!(published_at: 2.weeks.ago)
+            expect {
+              page.update_attributes!(public: true)
+            }.to_not change { page.read_attribute(:published_at) }
+          end
+        end
+
+        context "public has not changed" do
+          it "should not update published_at" do
+            page.update_attributes!(name: 'New Name')
+            expect(page.read_attribute(:published_at)).to be_nil
           end
         end
       end
@@ -188,9 +212,9 @@ module Alchemy
         let(:page)     { FactoryGirl.create(:page, parent_id: parent_1.id, name: 'Page', visible: true) }
 
         it "updates the urlname" do
-          page.urlname.should == 'parent-1/page'
+          expect(page.urlname).to eq('parent-1/page')
           page.move_to_child_of parent_2
-          page.urlname.should == 'parent-2/page'
+          expect(page.urlname).to eq('parent-2/page')
         end
 
         context 'of an external page' do
@@ -198,48 +222,48 @@ module Alchemy
 
           it "the urlname does not get updated" do
             external.move_to_child_of parent_2
-            external.urlname.should == 'http://google.com'
+            expect(external.urlname).to eq('http://google.com')
           end
         end
       end
 
       context "a normal page" do
         before do
-          @page = FactoryGirl.build(:page, :language_code => nil, :language => klingonian, :do_not_autogenerate => false)
+          @page = FactoryGirl.build(:page, language_code: nil, language: klingonian, do_not_autogenerate: false)
         end
 
         it "should set the language code" do
           @page.save
-          @page.language_code.should == "kl"
+          expect(@page.language_code).to eq("kl")
         end
 
         it "should autogenerate the elements" do
           @page.save
-          @page.elements.should_not be_empty
+          expect(@page.elements).not_to be_empty
         end
 
         it "should not autogenerate elements that are already on the page" do
-          @page.elements << FactoryGirl.create(:element, :name => 'header')
+          @page.elements << FactoryGirl.create(:element, name: 'header')
           @page.save
-          @page.elements.select { |e| e.name == 'header' }.length.should == 1
+          expect(@page.elements.select { |e| e.name == 'header' }.length).to eq(1)
         end
 
         context "with cells" do
           before do
-            @page.stub(:definition).and_return({'name' => 'with_cells', 'cells' => ['header', 'main']})
+            allow(@page).to receive(:definition).and_return({'name' => 'with_cells', 'cells' => ['header', 'main']})
           end
 
           it "should have the generated elements in their cells" do
-            @page.stub(:cell_definitions).and_return([{'name' => 'header', 'elements' => ['article']}])
+            allow(@page).to receive(:cell_definitions).and_return([{'name' => 'header', 'elements' => ['article']}])
             @page.save
-            @page.cells.where(:name => 'header').first.elements.should_not be_empty
+            expect(@page.cells.where(name: 'header').first.elements).not_to be_empty
           end
 
           context "and no elements in cell definitions" do
             it "should have the elements in the nil cell" do
-              @page.stub(:cell_definitions).and_return([{'name' => 'header', 'elements' => []}])
+              allow(@page).to receive(:cell_definitions).and_return([{'name' => 'header', 'elements' => []}])
               @page.save
-              @page.cells.collect(&:elements).flatten.should be_empty
+              expect(@page.cells.collect(&:elements).flatten).to be_empty
             end
           end
         end
@@ -247,7 +271,7 @@ module Alchemy
         context "with children getting restricted set to true" do
           before do
             @page.save
-            @child1 = FactoryGirl.create(:page, :name => 'Child 1', :parent_id => @page.id)
+            @child1 = FactoryGirl.create(:page, name: 'Child 1', parent_id: @page.id)
             @page.reload
             @page.restricted = true
             @page.save
@@ -255,19 +279,19 @@ module Alchemy
 
           it "should restrict all its children" do
             @child1.reload
-            @child1.restricted?.should be_true
+            expect(@child1.restricted?).to be_truthy
           end
         end
 
         context "with restricted parent gets created" do
           before do
             @page.save
-            @page.parent.update_attributes(:restricted => true)
-            @new_page = FactoryGirl.create(:page, :name => 'New Page', :parent_id => @page.id)
+            @page.parent.update_attributes(restricted: true)
+            @new_page = FactoryGirl.create(:page, name: 'New Page', parent_id: @page.id)
           end
 
           it "should also be restricted" do
-            @new_page.restricted?.should be_true
+            expect(@new_page.restricted?).to be_truthy
           end
         end
 
@@ -278,7 +302,7 @@ module Alchemy
 
           it "should not autogenerate the elements" do
             @page.save
-            @page.elements.should be_empty
+            expect(@page.elements).to be_empty
           end
         end
       end
@@ -289,11 +313,11 @@ module Alchemy
         end
 
         it "should not get the language code for language" do
-          @page.language_code.should be_nil
+          expect(@page.language_code).to be_nil
         end
 
         it "should not autogenerate the elements" do
-          @page.elements.should be_empty
+          expect(@page.elements).to be_empty
         end
       end
 
@@ -310,7 +334,7 @@ module Alchemy
 
         it "should autogenerate elements" do
           news_page.update_attributes(page_layout: 'contact')
-          news_page.elements.pluck(:name).should include('contactform')
+          expect(news_page.elements.pluck(:name)).to include('contactform')
         end
       end
     end
@@ -321,73 +345,124 @@ module Alchemy
     describe '.all_from_clipboard_for_select' do
       context "with clipboard holding pages having non unique page layout" do
         it "should return the pages" do
-          page_1 = FactoryGirl.create(:page, :language => language)
-          page_2 = FactoryGirl.create(:page, :language => language, :name => 'Another page')
+          page_1 = FactoryGirl.create(:page, language: language)
+          page_2 = FactoryGirl.create(:page, language: language, name: 'Another page')
           clipboard = [
             {'id' => page_1.id.to_s, 'action' => 'copy'},
             {'id' => page_2.id.to_s, 'action' => 'copy'}
           ]
-          Page.all_from_clipboard_for_select(clipboard, language.id).should include(page_1, page_2)
+          expect(Page.all_from_clipboard_for_select(clipboard, language.id)).to include(page_1, page_2)
         end
       end
 
       context "with clipboard holding a page having unique page layout" do
         it "should not return any pages" do
-          page_1 = FactoryGirl.create(:page, :language => language, :page_layout => 'contact')
+          page_1 = FactoryGirl.create(:page, language: language, page_layout: 'contact')
           clipboard = [
             {'id' => page_1.id.to_s, 'action' => 'copy'}
           ]
-          Page.all_from_clipboard_for_select(clipboard, language.id).should == []
+          expect(Page.all_from_clipboard_for_select(clipboard, language.id)).to eq([])
         end
       end
 
       context "with clipboard holding two pages. One having a unique page layout." do
         it "should return one page" do
-          page_1 = FactoryGirl.create(:page, :language => language, :page_layout => 'standard')
-          page_2 = FactoryGirl.create(:page, :name => 'Another page', :language => language, :page_layout => 'contact')
+          page_1 = FactoryGirl.create(:page, language: language, page_layout: 'standard')
+          page_2 = FactoryGirl.create(:page, name: 'Another page', language: language, page_layout: 'contact')
           clipboard = [
             {'id' => page_1.id.to_s, 'action' => 'copy'},
             {'id' => page_2.id.to_s, 'action' => 'copy'}
           ]
-          Page.all_from_clipboard_for_select(clipboard, language.id).should == [page_1]
+          expect(Page.all_from_clipboard_for_select(clipboard, language.id)).to eq([page_1])
         end
       end
     end
 
     describe '.all_locked' do
       it "should return 1 page that is blocked by a user at the moment" do
-        FactoryGirl.create(:public_page, :locked => true, :name => 'First Public Child', :parent_id => language_root.id, :language => language)
-        Page.all_locked.should have(1).pages
+        FactoryGirl.create(:public_page, locked: true, name: 'First Public Child', parent_id: language_root.id, language: language)
+        expect(Page.all_locked.size).to eq(1)
+      end
+    end
+
+    describe '.all_locked_by' do
+      let(:user) { double(:user, id: 1, class: DummyUser) }
+
+      before do
+        FactoryGirl.create(:public_page, locked: true, locked_by: 53) # This page must not be part of the collection
+        allow(user.class)
+          .to receive(:primary_key)
+          .and_return('id')
+      end
+
+      it "should return the correct page collection blocked by a certain user" do
+        page = FactoryGirl.create(:public_page, locked: true, locked_by: 1)
+        expect(Page.all_locked_by(user).pluck(:id)).to eq([page.id])
+      end
+
+      context 'with user class having a different primary key' do
+        let(:user) { double(:user, user_id: 123, class: DummyUser) }
+
+        before do
+          allow(user.class)
+            .to receive(:primary_key)
+            .and_return('user_id')
+        end
+
+        it "should return the correct page collection blocked by a certain user" do
+          page = FactoryGirl.create(:public_page, locked: true, locked_by: 123)
+          expect(Page.all_locked_by(user).pluck(:id)).to eq([page.id])
+        end
+      end
+    end
+
+    describe '.ancestors_for' do
+      let(:lang_root) { Page.language_root_for(Language.default.id) }
+      let(:parent)    { create(:public_page) }
+      let(:page)      { create(:public_page, parent_id: parent.id) }
+
+      it "returns an array of all parents including self" do
+        expect(Page.ancestors_for(page)).to eq([lang_root, parent, page])
+      end
+
+      it "does not include the root page" do
+        expect(Page.ancestors_for(page)).not_to include(Page.root)
+      end
+
+      context "with current page nil" do
+        it "should return an empty array" do
+          expect(Page.ancestors_for(nil)).to eq([])
+        end
       end
     end
 
     describe '.contentpages' do
       before do
         layoutroot = Page.find_or_create_layout_root_for(klingonian.id)
-        @layoutpage = FactoryGirl.create(:public_page, :name => 'layoutpage', :layoutpage => true, :parent_id => layoutroot.id, :language => klingonian)
-        @klingonian_lang_root = FactoryGirl.create(:language_root_page, :name => 'klingonian_lang_root', :layoutpage => nil, :language => klingonian)
-        @contentpage = FactoryGirl.create(:public_page, :name => 'contentpage', :parent_id => language_root.id, :language => language)
+        @layoutpage = FactoryGirl.create(:public_page, name: 'layoutpage', layoutpage: true, parent_id: layoutroot.id, language: klingonian)
+        @klingonian_lang_root = FactoryGirl.create(:language_root_page, name: 'klingonian_lang_root', layoutpage: nil, language: klingonian)
+        @contentpage = FactoryGirl.create(:public_page, name: 'contentpage', parent_id: language_root.id, language: language)
       end
 
       it "should return a collection of contentpages" do
-        Page.contentpages.to_a.should include(language_root, @klingonian_lang_root, @contentpage)
+        expect(Page.contentpages.to_a).to include(language_root, @klingonian_lang_root, @contentpage)
       end
 
       it "should not contain pages with attribute :layoutpage set to true" do
-        Page.contentpages.to_a.select { |p| p.layoutpage == true }.should be_empty
+        expect(Page.contentpages.to_a.select { |p| p.layoutpage == true }).to be_empty
       end
 
       it "should contain pages with attribute :layoutpage set to nil" do
-        Page.contentpages.to_a.select { |p| p.layoutpage == nil }.should include(@klingonian_lang_root)
+        expect(Page.contentpages.to_a.select { |p| p.layoutpage == nil }).to include(@klingonian_lang_root)
       end
     end
 
     describe '.copy' do
-      let(:page) { FactoryGirl.create(:page, :name => 'Source') }
+      let(:page) { FactoryGirl.create(:page, name: 'Source') }
       subject { Page.copy(page) }
 
       it "the copy should have added (copy) to name" do
-        subject.name.should == "#{page.name} (Copy)"
+        expect(subject.name).to eq("#{page.name} (Copy)")
       end
 
       context "page with tags" do
@@ -397,8 +472,8 @@ module Alchemy
           # The order of tags varies between postgresql and sqlite/mysql
           # This is related to acts-as-taggable-on v.2.4.1
           # To fix the spec we sort the tags until the issue is solved (https://github.com/mbleigh/acts-as-taggable-on/issues/363)
-          subject.tag_list.should_not be_empty
-          subject.tag_list.sort.should == page.tag_list.sort
+          expect(subject.tag_list).not_to be_empty
+          expect(subject.tag_list.sort).to eq(page.tag_list.sort)
         end
       end
 
@@ -406,8 +481,8 @@ module Alchemy
         before { page.elements << FactoryGirl.create(:element) }
 
         it "the copy should have source elements" do
-          subject.elements.should_not be_empty
-          subject.elements.count.should == page.elements.count
+          expect(subject.elements).not_to be_empty
+          expect(subject.elements.count).to eq(page.elements.count)
         end
       end
 
@@ -418,7 +493,7 @@ module Alchemy
         end
 
         it "the copy should not hold a copy of the trashed elements" do
-          subject.elements.should be_empty
+          expect(subject.elements).to be_empty
         end
       end
 
@@ -426,26 +501,26 @@ module Alchemy
         before { page.cells << FactoryGirl.create(:cell) }
 
         it "the copy should have source cells" do
-          subject.cells.should_not be_empty
-          subject.cells.count.should == page.cells.length # It must be length, because!
+          expect(subject.cells).not_to be_empty
+          expect(subject.cells.count).to eq(page.cells.length) # It must be length, because!
         end
       end
 
       context "page with autogenerate elements" do
         before do
           page = FactoryGirl.create(:page)
-          page.stub(:definition).and_return({'name' => 'standard', 'elements' => ['headline'], 'autogenerate' => ['headline']})
+          allow(page).to receive(:definition).and_return({'name' => 'standard', 'elements' => ['headline'], 'autogenerate' => ['headline']})
         end
 
         it "the copy should not autogenerate elements" do
-          subject.elements.should be_empty
+          expect(subject.elements).to be_empty
         end
       end
 
       context "with different page name given" do
-        subject { Page.copy(page, {:name => 'Different name'}) }
+        subject { Page.copy(page, {name: 'Different name'}) }
         it "should take this name" do
-          subject.name.should == 'Different name'
+          expect(subject.name).to eq('Different name')
         end
       end
     end
@@ -453,13 +528,13 @@ module Alchemy
     describe '.create' do
       context "before/after filter" do
         it "should automatically set the title from its name" do
-          page = FactoryGirl.create(:page, :name => 'My Testpage', :language => language, :parent_id => language_root.id)
-          page.title.should == 'My Testpage'
+          page = FactoryGirl.create(:page, name: 'My Testpage', language: language, parent_id: language_root.id)
+          expect(page.title).to eq('My Testpage')
         end
 
         it "should get a webfriendly urlname" do
-          page = FactoryGirl.create(:page, :name => 'klingon$&stößel ', :language => language, :parent_id => language_root.id)
-          page.urlname.should == 'klingon-stoessel'
+          page = FactoryGirl.create(:page, name: 'klingon$&stößel ', language: language, parent_id: language_root.id)
+          expect(page.urlname).to eq('klingon-stoessel')
         end
 
         context "with no name set" do
@@ -470,35 +545,35 @@ module Alchemy
         end
 
         it "should generate a three letter urlname from two letter name" do
-          page = FactoryGirl.create(:page, :name => 'Au', :language => language, :parent_id => language_root.id)
-          page.urlname.should == '-au'
+          page = FactoryGirl.create(:page, name: 'Au', language: language, parent_id: language_root.id)
+          expect(page.urlname).to eq('-au')
         end
 
         it "should generate a three letter urlname from two letter name with umlaut" do
-          page = FactoryGirl.create(:page, :name => 'Aü', :language => language, :parent_id => language_root.id)
-          page.urlname.should == 'aue'
+          page = FactoryGirl.create(:page, name: 'Aü', language: language, parent_id: language_root.id)
+          expect(page.urlname).to eq('aue')
         end
 
         it "should generate a three letter urlname from one letter name" do
-          page = FactoryGirl.create(:page, :name => 'A', :language => language, :parent_id => language_root.id)
-          page.urlname.should == '--a'
+          page = FactoryGirl.create(:page, name: 'A', language: language, parent_id: language_root.id)
+          expect(page.urlname).to eq('--a')
         end
 
         it "should add a user stamper" do
-          page = FactoryGirl.create(:page, :name => 'A', :language => language, :parent_id => language_root.id)
-          page.class.stamper_class.to_s.should == 'DummyUser'
+          page = FactoryGirl.create(:page, name: 'A', language: language, parent_id: language_root.id)
+          expect(page.class.stamper_class.to_s).to eq('DummyUser')
         end
 
         context "with language given" do
           it "does not set the language from parent" do
-            Page.any_instance.should_not_receive(:set_language_from_parent_or_default)
+            expect_any_instance_of(Page).not_to receive(:set_language_from_parent_or_default)
             Page.create!(name: 'A', parent_id: language_root.id, page_layout: 'standard', language: language)
           end
         end
 
         context "with no language given" do
           it "sets the language from parent" do
-            Page.any_instance.should_receive(:set_language_from_parent_or_default)
+            expect_any_instance_of(Page).to receive(:set_language_from_parent_or_default)
             Page.create!(name: 'A', parent_id: language_root.id, page_layout: 'standard')
           end
         end
@@ -511,15 +586,15 @@ module Alchemy
       let(:language)    { mock_model('Language', name: 'English') }
       let(:language_id) { language.id }
 
-      before { Language.stub(:find).and_return(language) }
+      before { allow(Language).to receive(:find).and_return(language) }
 
       context 'if no layout root page for given language id could be found' do
         before do
-          Page.should_receive(:create!).and_return(page)
+          expect(Page).to receive(:create!).and_return(page)
         end
 
         it "creates one" do
-          should eq(page)
+          is_expected.to eq(page)
         end
       end
 
@@ -527,85 +602,69 @@ module Alchemy
         let(:page) { mock_model('Page') }
 
         before do
-          Page.should_receive(:layout_root_for).and_return(page)
+          expect(Page).to receive(:layout_root_for).and_return(page)
         end
 
         it "returns layout root page" do
-          should eq(page)
+          is_expected.to eq(page)
         end
       end
     end
 
     describe '.language_roots' do
       it "should return 1 language_root" do
-        FactoryGirl.create(:public_page, :name => 'First Public Child', :parent_id => language_root.id, :language => language)
-        Page.language_roots.should have(1).pages
-      end
-    end
-
-    describe '.layout_description' do
-      it "should raise Exception if the page_layout could not be found in the definition file" do
-        expect { page.layout_description }.to raise_error
-      end
-
-      context "for a language root page" do
-        it "should return the page layout description as hash" do
-          language_root.layout_description['name'].should == 'intro'
-        end
-
-        it "should return an empty hash for root page" do
-          rootpage.layout_description.should == {}
-        end
+        FactoryGirl.create(:public_page, name: 'First Public Child', parent_id: language_root.id, language: language)
+        expect(Page.language_roots.size).to eq(1)
       end
     end
 
     describe '.layoutpages' do
       it "should return 1 layoutpage" do
-        FactoryGirl.create(:public_page, :layoutpage => true, :name => 'Layoutpage', :parent_id => rootpage.id, :language => language)
-        Page.layoutpages.should have(1).pages
+        FactoryGirl.create(:public_page, layoutpage: true, name: 'Layoutpage', parent_id: rootpage.id, language: language)
+        expect(Page.layoutpages.size).to eq(1)
       end
     end
 
     describe '.not_locked' do
       it "should return pages that are not blocked by a user at the moment" do
-        FactoryGirl.create(:public_page, :locked => true, :name => 'First Public Child', :parent_id => language_root.id, :language => language)
-        FactoryGirl.create(:public_page, :name => 'Second Public Child', :parent_id => language_root.id, :language => language)
-        Page.not_locked.should have(3).pages
+        FactoryGirl.create(:public_page, locked: true, name: 'First Public Child', parent_id: language_root.id, language: language)
+        FactoryGirl.create(:public_page, name: 'Second Public Child', parent_id: language_root.id, language: language)
+        expect(Page.not_locked.size).to eq(3)
       end
     end
 
     describe '.not_restricted' do
       it "should return 2 accessible pages" do
-        FactoryGirl.create(:public_page, :name => 'First Public Child', :restricted => true, :parent_id => language_root.id, :language => language)
-        Page.not_restricted.should have(2).pages
+        FactoryGirl.create(:public_page, name: 'First Public Child', restricted: true, parent_id: language_root.id, language: language)
+        expect(Page.not_restricted.size).to eq(2)
       end
     end
 
     describe '.public' do
       it "should return pages that are public" do
-        FactoryGirl.create(:public_page, :name => 'First Public Child', :parent_id => language_root.id, :language => language)
-        FactoryGirl.create(:public_page, :name => 'Second Public Child', :parent_id => language_root.id, :language => language)
-        Page.published.should have(3).pages
+        FactoryGirl.create(:public_page, name: 'First Public Child', parent_id: language_root.id, language: language)
+        FactoryGirl.create(:public_page, name: 'Second Public Child', parent_id: language_root.id, language: language)
+        expect(Page.published.size).to eq(3)
       end
     end
 
     describe '.restricted' do
       it "should return 1 restricted page" do
-        FactoryGirl.create(:public_page, :name => 'First Public Child', :restricted => true, :parent_id => language_root.id, :language => language)
-        Page.restricted.should have(1).pages
+        FactoryGirl.create(:public_page, name: 'First Public Child', restricted: true, parent_id: language_root.id, language: language)
+        expect(Page.restricted.size).to eq(1)
       end
     end
 
     describe '.rootpage' do
       it "should contain one rootpage" do
-        Page.rootpage.should be_instance_of(Page)
+        expect(Page.rootpage).to be_instance_of(Page)
       end
     end
 
     describe '.visible' do
       it "should return 1 visible page" do
-        FactoryGirl.create(:public_page, :name => 'First Public Child', :visible => true, :parent_id => language_root.id, :language => language)
-        Page.visible.should have(1).pages
+        FactoryGirl.create(:public_page, name: 'First Public Child', visible: true, parent_id: language_root.id, language: language)
+        expect(Page.visible.size).to eq(1)
       end
     end
 
@@ -616,27 +675,22 @@ module Alchemy
       let(:page) { FactoryGirl.build_stubbed(:public_page) }
 
       it "returns all element definitions of available elements" do
-        page.available_element_definitions.should be_an(Array)
-        page.available_element_definitions.collect { |e| e['name'] }.should include('header')
+        expect(page.available_element_definitions).to be_an(Array)
+        expect(page.available_element_definitions.collect { |e| e['name'] }).to include('header')
       end
 
       context "with unique elements already on page" do
         let(:element) { FactoryGirl.build_stubbed(:unique_element) }
-        before { page.stub_chain(:elements, :not_trashed, :pluck).and_return([element.name]) }
+
+        before do
+          allow(page)
+            .to receive(:elements)
+            .and_return double(not_trashed: double(pluck: [element.name]))
+        end
 
         it "does not return unique element definitions" do
-          page.available_element_definitions.collect { |e| e['name'] }.should include('article')
-          page.available_element_definitions.collect { |e| e['name'] }.should_not include('header')
-        end
-      end
-
-      context "for page_layout not existing" do
-        let(:page) { FactoryGirl.build_stubbed(:page, page_layout: 'not_existing_one') }
-
-        it "should raise error" do
-          expect {
-            page.available_element_definitions
-          }.to raise_error(Alchemy::PageLayoutDefinitionError)
+          expect(page.available_element_definitions.collect { |e| e['name'] }).to include('article')
+          expect(page.available_element_definitions.collect { |e| e['name'] }).not_to include('header')
         end
       end
 
@@ -648,7 +702,7 @@ module Alchemy
         let(:element_3) { FactoryGirl.build_stubbed(:element, name: 'column_headline') }
 
         before {
-          Element.stub(:definitions).and_return([
+          allow(Element).to receive(:definitions).and_return([
             {
               'name' => 'column_headline',
               'amount' => 3,
@@ -661,25 +715,32 @@ module Alchemy
               'contents' => [{'name' => 'headline', 'type' => 'EssenceText'}]
             }
           ])
-          PageLayout.stub(:get).and_return({
+          allow(PageLayout).to receive(:get).and_return({
             'name' => 'columns',
             'elements' => ['column_headline', 'unique_headline'],
             'autogenerate' => ['unique_headline', 'column_headline', 'column_headline', 'column_headline']
           })
-          page.stub_chain(:elements, :not_trashed, :pluck).and_return([unique_element.name, element_1.name, element_2.name, element_3.name])
+          allow(page).to receive(:elements).and_return double(
+            not_trashed: double(pluck: [
+              unique_element.name,
+              element_1.name,
+              element_2.name,
+              element_3.name
+            ])
+          )
         }
 
         it "should be readable" do
           element = page.element_definitions_by_name('column_headline').first
-          element['amount'].should be 3
+          expect(element['amount']).to be 3
         end
 
         it "should limit elements" do
-          page.available_element_definitions.collect { |e| e['name'] }.should_not include('column_headline')
+          expect(page.available_element_definitions.collect { |e| e['name'] }).not_to include('column_headline')
         end
 
         it "should be ignored if unique" do
-          page.available_element_definitions.collect { |e| e['name'] }.should_not include('unique_headline')
+          expect(page.available_element_definitions.collect { |e| e['name'] }).not_to include('unique_headline')
         end
       end
     end
@@ -693,26 +754,44 @@ module Alchemy
     end
 
     describe '#cache_key' do
-      let(:page) { stub_model(Page) }
-      subject { page }
-      its(:cache_key) { should match(page.id.to_s) }
+      let(:page) do
+        stub_model(Page, updated_at: Time.now, published_at: Time.now - 1.week)
+      end
+
+      subject { page.cache_key }
+
+      before do
+        expect(Page).to receive(:current_preview).and_return(preview)
+      end
+
+      context "when current page rendered in preview mode" do
+        let(:preview) { page }
+
+        it { is_expected.to eq("alchemy/pages/#{page.id}-#{page.updated_at}") }
+      end
+
+      context "when current page not in preview mode" do
+        let(:preview) { nil }
+
+        it { is_expected.to eq("alchemy/pages/#{page.id}-#{page.published_at}") }
+      end
     end
 
     describe '#cell_definitions' do
       before do
-        @page = FactoryGirl.build(:page, :page_layout => 'foo')
-        @page.stub(:layout_description).and_return({'name' => "foo", 'cells' => ["foo_cell"]})
+        @page = FactoryGirl.build(:page, page_layout: 'foo')
+        allow(@page).to receive(:definition).and_return({'name' => "foo", 'cells' => ["foo_cell"]})
         @cell_descriptions = [{'name' => "foo_cell", 'elements' => ["1", "2"]}]
-        Cell.stub(:definitions).and_return(@cell_descriptions)
+        allow(Cell).to receive(:definitions).and_return(@cell_descriptions)
       end
 
       it "should return all cell definitions for its page_layout" do
-        @page.cell_definitions.should == @cell_descriptions
+        expect(@page.cell_definitions).to eq(@cell_descriptions)
       end
 
       it "should return empty array if no cells defined in page layout" do
-        @page.stub(:layout_description).and_return({'name' => "foo"})
-        @page.cell_definitions.should == []
+        allow(@page).to receive(:definition).and_return({'name' => "foo"})
+        expect(@page.cell_definitions).to eq([])
       end
     end
 
@@ -722,7 +801,7 @@ module Alchemy
 
         it "should not delete the trashed elements" do
           news_page.destroy
-          Element.trashed.should_not be_empty
+          expect(Element.trashed).not_to be_empty
         end
       end
     end
@@ -730,22 +809,11 @@ module Alchemy
     describe '#element_definitions' do
       let(:page) { FactoryGirl.build_stubbed(:page) }
       subject { page.element_definitions }
-      before { Element.should_receive(:definitions).and_return([{'name' => 'article'}, {'name' => 'header'}]) }
+      before { expect(Element).to receive(:definitions).and_return([{'name' => 'article'}, {'name' => 'header'}]) }
 
       it "returns all element definitions that could be placed on current page" do
-        should include({'name' => 'article'})
-        should include({'name' => 'header'})
-      end
-    end
-
-    describe '#element_definitions' do
-      let(:page) { FactoryGirl.build_stubbed(:page) }
-      subject { page.element_definitions }
-      before { Element.should_receive(:definitions).and_return([{'name' => 'article'}, {'name' => 'header'}]) }
-
-      it "returns all element definitions that could be placed on current page" do
-        should include({'name' => 'article'})
-        should include({'name' => 'header'})
+        is_expected.to include({'name' => 'article'})
+        is_expected.to include({'name' => 'header'})
       end
     end
 
@@ -754,20 +822,20 @@ module Alchemy
 
       context "with no name given" do
         it "returns empty array" do
-          page.element_definitions_by_name(nil).should == []
+          expect(page.element_definitions_by_name(nil)).to eq([])
         end
       end
 
       context "with 'all' passed as name" do
         it "returns all element definitions" do
-          Element.should_receive(:definitions)
+          expect(Element).to receive(:definitions)
           page.element_definitions_by_name('all')
         end
       end
 
       context "with :all passed as name" do
         it "returns all element definitions" do
-          Element.should_receive(:definitions)
+          expect(Element).to receive(:definitions)
           page.element_definitions_by_name(:all)
         end
       end
@@ -776,27 +844,110 @@ module Alchemy
     describe '#element_definition_names' do
       let(:page) { FactoryGirl.build_stubbed(:public_page) }
 
-      it "returns all element names defined in page layout" do
-        page.element_definition_names.should == %w(article header)
+      context "with assigned elements from page and cell definition" do
+        before do
+          allow(page).to receive(:element_names_from_page_definition).and_return(['header', 'article'])
+          allow(page).to receive(:element_names_from_cell_definition).and_return(['search'])
+        end
+
+        it "returns the combined element names" do
+          expect(page.element_definition_names).to eq(%w(header article search))
+        end
+
+        context "when cell definition contains same element name as page definition" do
+          before do
+            allow(page).to receive(:element_names_from_page_definition).and_return(['header', 'article'])
+            allow(page).to receive(:element_names_from_cell_definition).and_return(['header', 'search'])
+          end
+
+          it "returns no duplicates" do
+            expect(page.element_definition_names).to eq(%w(header article search))
+          end
+        end
       end
 
-      it "returns always an array" do
-        page.stub(:definition).and_return({})
-        page.element_definition_names.should be_an(Array)
+      context "without assigned elements from page definition" do
+        before do
+          allow(page).to receive(:element_names_from_page_definition).and_return([])
+          allow(page).to receive(:element_names_from_cell_definition).and_return(['article'])
+        end
+
+        it "returns an array" do
+          expect(page.element_definition_names).to be_an(Array)
+        end
+      end
+
+      context "without assigned elements from cell definition" do
+        before do
+          allow(page).to receive(:element_names_from_page_definition).and_return(['article'])
+          allow(page).to receive(:element_names_from_cell_definition).and_return([])
+        end
+
+        it "returns an array" do
+          expect(page.element_definition_names).to be_an(Array)
+        end
+      end
+    end
+
+    describe "#element_names_from_page_definition" do
+      let(:page) { FactoryGirl.build_stubbed(:public_page) }
+
+      context "with assigned elements from page definition" do
+        before do
+          allow(page).to receive(:definition).and_return(
+            {'name' => 'test_page', 'elements' => ['article']}
+          )
+        end
+
+        it "returns an array of the page's element names" do
+          expect(page.element_names_from_page_definition).to eq(['article'])
+        end
+      end
+
+      context "without assigned elements from page definition" do
+        before do
+          allow(page).to receive(:definition).and_return({})
+        end
+
+        it "returns an array" do
+          expect(page.element_names_from_page_definition).to be_an(Array)
+        end
+      end
+    end
+
+    describe "#element_names_from_cell_definition" do
+      let(:page) { FactoryGirl.build_stubbed(:public_page) }
+
+      context "with assigned elements from cell definition" do
+        before do
+          allow(page).to receive(:cell_definitions).and_return([
+            {'name' => 'header', 'elements' => ['article']}
+          ])
+        end
+
+        it "returns an array of the cell's element names" do
+          expect(page.element_names_from_cell_definition).to eq(['article'])
+        end
+      end
+
+      context "without assigned elements from cell definition" do
+        it "returns an array" do
+          expect(page.element_names_from_cell_definition).to be_an(Array)
+        end
       end
     end
 
     describe '#elements_grouped_by_cells' do
-      let(:page) { FactoryGirl.create(:public_page, :do_not_autogenerate => false) }
+      let(:page) { FactoryGirl.create(:public_page, do_not_autogenerate: false) }
 
       before do
-        PageLayout.stub(:get).and_return({
+        allow(PageLayout).to receive(:get).and_return({
           'name' => 'standard',
           'cells' => ['header'],
           'elements' => ['header', 'text'],
           'autogenerate' => ['header', 'text']
         })
-        Cell.stub(:definitions).and_return([{
+        allow(Cell).to receive(:definitions).and_return([{
           'name' => "header",
           'elements' => ["header"]
         }])
@@ -804,47 +955,47 @@ module Alchemy
 
       it "should return elements grouped by cell" do
         elements = page.elements_grouped_by_cells
-        elements.keys.first.should be_instance_of(Cell)
-        elements.values.first.first.should be_instance_of(Element)
+        expect(elements.keys.first).to be_instance_of(Cell)
+        expect(elements.values.first.first).to be_instance_of(Element)
       end
 
       it "should only include elements beeing in a cell " do
-        page.elements_grouped_by_cells.keys.should_not include(nil)
+        expect(page.elements_grouped_by_cells.keys).not_to include(nil)
       end
     end
 
     describe '#feed_elements' do
       it "should return all rss feed elements" do
-        news_page.feed_elements.should_not be_empty
-        news_page.feed_elements.should == Element.where(name: 'news').to_a
+        expect(news_page.feed_elements).not_to be_empty
+        expect(news_page.feed_elements).to eq(Element.where(name: 'news').to_a)
       end
     end
 
     describe '#find_elements' do
       before do
-        FactoryGirl.create(:element, :public => false, :page => public_page)
-        FactoryGirl.create(:element, :public => false, :page => public_page)
+        FactoryGirl.create(:element, public: false, page: public_page)
+        FactoryGirl.create(:element, public: false, page: public_page)
       end
 
       context "with show_non_public argument TRUE" do
         it "should return all elements from empty options" do
-          public_page.find_elements({}, true).to_a.should == public_page.elements.to_a
+          expect(public_page.find_elements({}, true).to_a).to eq(public_page.elements.to_a)
         end
 
         it "should only return the elements passed as options[:only]" do
-          public_page.find_elements({:only => ['article']}, true).to_a.should == public_page.elements.named('article').to_a
+          expect(public_page.find_elements({only: ['article']}, true).to_a).to eq(public_page.elements.named('article').to_a)
         end
 
         it "should not return the elements passed as options[:except]" do
-          public_page.find_elements({:except => ['article']}, true).to_a.should == public_page.elements - public_page.elements.named('article').to_a
+          expect(public_page.find_elements({except: ['article']}, true).to_a).to eq(public_page.elements - public_page.elements.named('article').to_a)
         end
 
         it "should return elements offsetted" do
-          public_page.find_elements({:offset => 2}, true).to_a.should == public_page.elements.offset(2)
+          expect(public_page.find_elements({offset: 2}, true).to_a).to eq(public_page.elements.offset(2))
         end
 
         it "should return elements limitted in count" do
-          public_page.find_elements({:count => 1}, true).to_a.should == public_page.elements.limit(1)
+          expect(public_page.find_elements({count: 1}, true).to_a).to eq(public_page.elements.limit(1))
         end
       end
 
@@ -852,29 +1003,34 @@ module Alchemy
         let(:element) { FactoryGirl.build_stubbed(:element) }
 
         context "given as String" do
-          context '' do
-            before {
-              public_page.cells.stub_chain(:find_by_name, :elements, :offset, :limit, :published).and_return([element])
-            }
+          context 'with elements present' do
+            before do
+              expect(public_page.cells)
+                .to receive(:find_by_name)
+                .and_return double(elements: double(offset: double(limit: double(published: [element]))))
+            end
 
             it "returns only the elements from given cell" do
-              public_page.find_elements(from_cell: 'A Cell').to_a.should == [element]
+              expect(public_page.find_elements(from_cell: 'A Cell').to_a).to eq([element])
             end
           end
 
           context "that can not be found" do
             let(:elements) {[]}
-            before {
-              elements.stub_chain(:offset, :limit, :published).and_return([])
-            }
+
+            before do
+              allow(elements)
+                .to receive(:offset)
+                .and_return double(limit: double(published: elements))
+            end
 
             it "returns empty set" do
-              Element.should_receive(:none).and_return(elements)
-              public_page.find_elements(from_cell: 'Lolo').to_a.should == []
+              expect(Element).to receive(:none).and_return(elements)
+              expect(public_page.find_elements(from_cell: 'Lolo').to_a).to eq([])
             end
 
             it "loggs a warning" do
-              Rails.logger.should_receive(:debug)
+              expect(Rails.logger).to receive(:debug)
               public_page.find_elements(from_cell: 'Lolo')
             end
           end
@@ -884,47 +1040,50 @@ module Alchemy
           let(:cell) { FactoryGirl.build_stubbed(:cell, page: public_page) }
 
           it "returns only the elements from given cell" do
-            cell.stub_chain(:elements, :offset, :limit, :published).and_return([element])
-            public_page.find_elements(from_cell: cell).to_a.should == [element]
+            expect(cell)
+              .to receive(:elements)
+              .and_return double(offset: double(limit: double(published: [element])))
+
+            expect(public_page.find_elements(from_cell: cell).to_a).to eq([element])
           end
         end
       end
 
       context "with show_non_public argument FALSE" do
         it "should return all elements from empty arguments" do
-          public_page.find_elements().to_a.should == public_page.elements.published.to_a
+          expect(public_page.find_elements().to_a).to eq(public_page.elements.published.to_a)
         end
 
         it "should only return the public elements passed as options[:only]" do
-          public_page.find_elements(:only => ['article']).to_a.should == public_page.elements.published.named('article').to_a
+          expect(public_page.find_elements(only: ['article']).to_a).to eq(public_page.elements.published.named('article').to_a)
         end
 
         it "should return all public elements except the ones passed as options[:except]" do
-          public_page.find_elements(:except => ['article']).to_a.should == public_page.elements.published.to_a - public_page.elements.published.named('article').to_a
+          expect(public_page.find_elements(except: ['article']).to_a).to eq(public_page.elements.published.to_a - public_page.elements.published.named('article').to_a)
         end
 
         it "should return elements offsetted" do
-          public_page.find_elements({:offset => 2}).to_a.should == public_page.elements.published.offset(2)
+          expect(public_page.find_elements({offset: 2}).to_a).to eq(public_page.elements.published.offset(2))
         end
 
         it "should return elements limitted in count" do
-          public_page.find_elements({:count => 1}).to_a.should == public_page.elements.published.limit(1)
+          expect(public_page.find_elements({count: 1}).to_a).to eq(public_page.elements.published.limit(1))
         end
       end
     end
 
     describe '#first_public_child' do
       before do
-        FactoryGirl.create(:page, :name => "First child", :language => language, :public => false, :parent_id => language_root.id)
+        FactoryGirl.create(:page, name: "First child", language: language, public: false, parent_id: language_root.id)
       end
 
       it "should return first_public_child" do
-        first_public_child = FactoryGirl.create(:public_page, :name => "First public child", :language => language, :parent_id => language_root.id)
-        language_root.first_public_child.should == first_public_child
+        first_public_child = FactoryGirl.create(:public_page, name: "First public child", language: language, parent_id: language_root.id)
+        expect(language_root.first_public_child).to eq(first_public_child)
       end
 
       it "should return nil if no public child exists" do
-        language_root.first_public_child.should == nil
+        expect(language_root.first_public_child).to eq(nil)
       end
     end
 
@@ -945,12 +1104,14 @@ module Alchemy
 
         context 'with user is a active record model' do
           before do
-            Alchemy.user_class.should_receive(:'<').and_return(true)
+            expect(Alchemy.user_class).to receive(:'<').and_return(true)
           end
 
           context 'if page is folded' do
             before do
-              page.stub_chain(:folded_pages, :where, :any?).and_return(true)
+              expect(page)
+                .to receive(:folded_pages)
+                .and_return double(where: double(any?: true))
             end
 
             it "should return true" do
@@ -968,10 +1129,36 @@ module Alchemy
     end
 
     describe '#get_language_root' do
+      before { language_root }
       subject { public_page.get_language_root }
 
       it "returns the language root page" do
-        should eq language_root
+        is_expected.to eq language_root
+      end
+    end
+
+    describe '#layout_description' do
+      context 'if the page layout could not be found in the definition file' do
+        let(:page) { build_stubbed(:page, page_layout: 'notexisting') }
+
+        it "it loggs a warning." do
+          expect(Alchemy::Logger).to receive(:warn)
+          page.layout_description
+        end
+
+        it "it returns empty hash." do
+          expect(page.layout_description).to eq({})
+        end
+      end
+
+      context "for a language root page" do
+        it "it returns the page layout description as hash." do
+          expect(language_root.layout_description['name']).to eq('index')
+        end
+
+        it "it returns an empty hash for root page." do
+          expect(rootpage.layout_description).to eq({})
+        end
       end
     end
 
@@ -982,7 +1169,7 @@ module Alchemy
       it "should set locked to true" do
         page.lock_to!(user)
         page.reload
-        page.locked.should == true
+        expect(page.locked).to eq(true)
       end
 
       it "should not update the timestamps " do
@@ -992,7 +1179,7 @@ module Alchemy
       it "should set locked_by to the users id" do
         page.lock_to!(user)
         page.reload
-        page.locked_by.should == user.id
+        expect(page.locked_by).to eq(user.id)
       end
     end
 
@@ -1005,7 +1192,7 @@ module Alchemy
       subject { Page.copy_and_paste(source, new_parent, page_name) }
 
       it "should copy the source page with the given name to the new parent" do
-        Page.should_receive(:copy).with(source, {
+        expect(Page).to receive(:copy).with(source, {
           parent_id: new_parent.id,
           language: new_parent.language,
           name: page_name,
@@ -1015,15 +1202,15 @@ module Alchemy
       end
 
       it "should return the copied page" do
-        Page.stub(:copy).and_return(copied_page)
+        allow(Page).to receive(:copy).and_return(copied_page)
         expect(subject).to be_a(copied_page.class)
       end
 
       context "if source page has children" do
         it "should also copy and paste the children" do
-          Page.stub(:copy).and_return(copied_page)
-          source.stub(:children).and_return([mock_model('Page')])
-          source.should_receive(:copy_children_to).with(copied_page)
+          allow(Page).to receive(:copy).and_return(copied_page)
+          allow(source).to receive(:children).and_return([mock_model('Page')])
+          expect(source).to receive(:copy_children_to).with(copied_page)
           subject
         end
       end
@@ -1045,26 +1232,26 @@ module Alchemy
 
       describe '#previous' do
         it "should return the previous page on the same level" do
-          center_page.previous.should == public_page
-          next_page.previous.should == center_page
+          expect(center_page.previous).to eq(public_page)
+          expect(next_page.previous).to eq(center_page)
         end
 
         context "no previous page on same level present" do
           it "should return nil" do
-            public_page.previous.should be_nil
+            expect(public_page.previous).to be_nil
           end
         end
 
         context "with options restricted" do
           context "set to true" do
             it "returns previous restricted page" do
-              center_page.previous(restricted: true).should == restricted_page
+              expect(center_page.previous(restricted: true)).to eq(restricted_page)
             end
           end
 
           context "set to false" do
             it "skips restricted page" do
-              center_page.previous(restricted: false).should == public_page
+              expect(center_page.previous(restricted: false)).to eq(public_page)
             end
           end
         end
@@ -1072,13 +1259,13 @@ module Alchemy
         context "with options public" do
           context "set to true" do
             it "returns previous public page" do
-              center_page.previous(public: true).should == public_page
+              expect(center_page.previous(public: true)).to eq(public_page)
             end
           end
 
           context "set to false" do
             it "skips public page" do
-              center_page.previous(public: false).should == non_public_page
+              expect(center_page.previous(public: false)).to eq(non_public_page)
             end
           end
         end
@@ -1086,12 +1273,12 @@ module Alchemy
 
       describe '#next' do
         it "should return the next page on the same level" do
-          center_page.next.should == next_page
+          expect(center_page.next).to eq(next_page)
         end
 
         context "no next page on same level present" do
           it "should return nil" do
-            next_page.next.should be_nil
+            expect(next_page.next).to be_nil
           end
         end
       end
@@ -1103,16 +1290,16 @@ module Alchemy
 
       before do
         current_time
-        Time.stub(:now).and_return(current_time)
+        allow(Time).to receive(:now).and_return(current_time)
         page.publish!
       end
 
       it "sets public attribute to true" do
-        page.public.should == true
+        expect(page.public).to eq(true)
       end
 
       it "sets published_at attribute to current time" do
-        page.published_at.should == current_time
+        expect(page.published_at).to eq(current_time)
       end
     end
 
@@ -1120,7 +1307,7 @@ module Alchemy
       let(:default_language) { mock_model('Language', code: 'es') }
       let(:page) { Page.new }
 
-      before { page.stub(:parent).and_return(parent) }
+      before { allow(page).to receive(:parent).and_return(parent) }
 
       subject { page }
 
@@ -1131,18 +1318,24 @@ module Alchemy
           page.send(:set_language_from_parent_or_default)
         end
 
-        its(:language_id) { should eq(parent.language_id) }
+        describe '#language_id' do
+          subject { super().language_id }
+          it { is_expected.to eq(parent.language_id) }
+        end
       end
 
       context "parent has no language" do
         let(:parent) { mock_model('Page', language: nil, language_id: nil, language_code: nil) }
 
         before do
-          Language.stub(:default).and_return(default_language)
+          allow(Language).to receive(:default).and_return(default_language)
           page.send(:set_language_from_parent_or_default)
         end
 
-        its(:language_id) { should eq(default_language.id) }
+        describe '#language_id' do
+          subject { super().language_id }
+          it { is_expected.to eq(default_language.id) }
+        end
       end
     end
 
@@ -1150,24 +1343,24 @@ module Alchemy
       context "definition has 'taggable' key with true value" do
         it "should return true" do
           page = FactoryGirl.build(:page)
-          page.stub(:definition).and_return({'name' => 'standard', 'taggable' => true})
-          page.taggable?.should be_true
+          allow(page).to receive(:definition).and_return({'name' => 'standard', 'taggable' => true})
+          expect(page.taggable?).to be_truthy
         end
       end
 
       context "definition has 'taggable' key with foo value" do
         it "should return false" do
           page = FactoryGirl.build(:page)
-          page.stub(:definition).and_return({'name' => 'standard', 'taggable' => 'foo'})
-          page.taggable?.should be_false
+          allow(page).to receive(:definition).and_return({'name' => 'standard', 'taggable' => 'foo'})
+          expect(page.taggable?).to be_falsey
         end
       end
 
       context "definition has no 'taggable' key" do
         it "should return false" do
           page = FactoryGirl.build(:page)
-          page.stub(:definition).and_return({'name' => 'standard'})
-          page.taggable?.should be_false
+          allow(page).to receive(:definition).and_return({'name' => 'standard'})
+          expect(page.taggable?).to be_falsey
         end
       end
     end
@@ -1176,13 +1369,13 @@ module Alchemy
       let(:page) { FactoryGirl.create(:page, locked: true, locked_by: 1) }
 
       before do
-        page.stub(:save).and_return(true)
+        allow(page).to receive(:save).and_return(true)
       end
 
       it "should set the locked status to false" do
         page.unlock!
         page.reload
-        page.locked.should == false
+        expect(page.locked).to eq(false)
       end
 
       it "should not update the timestamps " do
@@ -1192,41 +1385,56 @@ module Alchemy
       it "should set locked_by to nil" do
         page.unlock!
         page.reload
-        page.locked_by.should == nil
+        expect(page.locked_by).to eq(nil)
       end
 
       it "sets current preview to nil" do
         Page.current_preview = page
         page.unlock!
-        Page.current_preview.should be_nil
+        expect(Page.current_preview).to be_nil
       end
     end
 
     context 'urlname updating' do
-      let(:parentparent) { FactoryGirl.create(:page, name: 'parentparent', visible: true) }
-      let(:parent)       { FactoryGirl.create(:page, parent_id: parentparent.id, name: 'parent', visible: true) }
-      let(:page)         { FactoryGirl.create(:page, parent_id: parent.id, name: 'page', visible: true) }
-      let(:invisible)    { FactoryGirl.create(:page, parent_id: page.id, name: 'invisible', visible: false) }
-      let(:contact)      { FactoryGirl.create(:page, parent_id: invisible.id, name: 'contact', visible: true) }
-      let(:external)     { FactoryGirl.create(:page, parent_id: parent.id, name: 'external', page_layout: 'external', urlname: 'http://google.com') }
+      let(:parentparent)  { FactoryGirl.create(:page, name: 'parentparent', visible: true) }
+      let(:parent)        { FactoryGirl.create(:page, parent_id: parentparent.id, name: 'parent', visible: true) }
+      let(:page)          { FactoryGirl.create(:page, parent_id: parent.id, name: 'page', visible: true) }
+      let(:invisible)     { FactoryGirl.create(:page, parent_id: page.id, name: 'invisible', visible: false) }
+      let(:contact)       { FactoryGirl.create(:page, parent_id: invisible.id, name: 'contact', visible: true) }
+      let(:external)      { FactoryGirl.create(:page, parent_id: parent.id, name: 'external', page_layout: 'external', urlname: 'http://google.com') }
+      let(:language_root) { parentparent.parent }
 
       context "with activated url_nesting" do
-        before { Config.stub(:get).and_return(true) }
+        before { allow(Config).to receive(:get).and_return(true) }
 
         it "should store all parents urlnames delimited by slash" do
-          page.urlname.should == 'parentparent/parent/page'
+          expect(page.urlname).to eq('parentparent/parent/page')
         end
 
         it "should not include the root page" do
-          page.urlname.should_not =~ /root/
+          Page.root.update_column(:urlname, 'root')
+          language_root.update(urlname: 'new-urlname')
+          expect(language_root.urlname).not_to match(/root/)
         end
 
         it "should not include the language root page" do
-          page.urlname.should_not =~ /startseite/
+          expect(page.urlname).not_to match(/startseite/)
         end
 
         it "should not include invisible pages" do
-          contact.urlname.should_not =~ /invisible/
+          expect(contact.urlname).not_to match(/invisible/)
+        end
+
+        context "with an invisible parent" do
+          before { parent.update_attribute(:visible, false) }
+
+          it "does not change if set_urlname is called" do
+            expect { page.send(:set_urlname) }.not_to change { page.urlname }
+          end
+
+          it "does not change if update_urlname! is called" do
+            expect { page.update_urlname! }.not_to change { page.urlname }
+          end
         end
 
         context "after changing page's urlname" do
@@ -1235,7 +1443,7 @@ module Alchemy
             parentparent.urlname = 'new-urlname'
             parentparent.save!
             page.reload
-            page.urlname.should == 'new-urlname/parent/page'
+            expect(page.urlname).to eq('new-urlname/parent/page')
           end
 
           context 'with descendants that are redirecting to external' do
@@ -1244,15 +1452,15 @@ module Alchemy
               parent.urlname = 'new-urlname'
               parent.save!
               external.reload
-              external.urlname.should == 'http://google.com'
+              expect(external.urlname).to eq('http://google.com')
             end
           end
 
           it "should create a legacy url" do
-            page.stub(:slug).and_return('foo')
+            allow(page).to receive(:slug).and_return('foo')
             page.update_urlname!
-            page.legacy_urls.should_not be_empty
-            page.legacy_urls.pluck(:urlname).should include('parentparent/parent/page')
+            expect(page.legacy_urls).not_to be_empty
+            expect(page.legacy_urls.pluck(:urlname)).to include('parentparent/parent/page')
           end
         end
 
@@ -1262,16 +1470,16 @@ module Alchemy
             parentparent.visible = false
             parentparent.save!
             page.reload
-            page.urlname.should == 'parent/page'
+            expect(page.urlname).to eq('parent/page')
           end
         end
       end
 
       context "with disabled url_nesting" do
-        before { Config.stub(:get).and_return(false) }
+        before { allow(Config).to receive(:get).and_return(false) }
 
         it "should only store my urlname" do
-          page.urlname.should == 'page'
+          expect(page.urlname).to eq('page')
         end
       end
     end
@@ -1279,15 +1487,17 @@ module Alchemy
     describe "#update_node!" do
 
       let(:original_url) { "sample-url" }
-      let(:page) { FactoryGirl.create(:page, :language => language, :parent_id => language_root.id, :urlname => original_url, restricted: false) }
+      let(:page) { FactoryGirl.create(:page, language: language, parent_id: language_root.id, urlname: original_url, restricted: false) }
       let(:node) { TreeNode.new(10, 11, 12, 13, "another-url", true) }
 
       context "when nesting is enabled" do
-        before { Alchemy::Config.stub(:get).with(:url_nesting) { true } }
+        before { allow(Alchemy::Config).to receive(:get).with(:url_nesting) { true } }
 
         context "when page is not external" do
 
-          before { page.stub(redirects_to_external?: false)}
+          before do
+            expect(page).to receive(:redirects_to_external?).and_return(false)
+          end
 
           it "should update all attributes" do
             page.update_node!(node)
@@ -1320,8 +1530,11 @@ module Alchemy
         end
 
         context "when page is external" do
-
-          before { page.stub(redirects_to_external?: true) }
+          before do
+            expect(page)
+              .to receive(:redirects_to_external?)
+              .and_return(true)
+          end
 
           it "should update all attributes except url" do
             page.update_node!(node)
@@ -1343,11 +1556,14 @@ module Alchemy
       end
 
       context "when nesting is disabled" do
-        before { Alchemy::Config.stub(:get).with(:url_nesting) { false } }
+        before do
+          allow(Alchemy::Config).to receive(:get).with(:url_nesting) { false }
+        end
 
         context "when page is not external" do
-
-          before { page.stub(redirects_to_external?: false)}
+          before do
+            allow(page).to receive(:redirects_to_external?).and_return(false)
+          end
 
           it "should update all attributes except url" do
             page.update_node!(node)
@@ -1365,14 +1581,13 @@ module Alchemy
             page.reload
             expect(page.legacy_urls.size).to eq(0)
           end
-
         end
 
         context "when page is external" do
-
-          before { page.stub(redirects_to_external?: true) }
-
-          before { Alchemy::Config.stub(get: true) }
+          before do
+            expect(Alchemy::Config).to receive(:get).and_return(true)
+            allow(page).to receive(:redirects_to_external?).and_return(true)
+          end
 
           it "should update all attributes except url" do
             page.update_node!(node)
@@ -1399,7 +1614,7 @@ module Alchemy
         let(:page) { FactoryGirl.build(:page, urlname: 'root/parent/my-name')}
 
         it "should return the last part of the urlname" do
-          page.slug.should == 'my-name'
+          expect(page.slug).to eq('my-name')
         end
       end
 
@@ -1407,7 +1622,7 @@ module Alchemy
         let(:page) { FactoryGirl.build(:page, urlname: 'my-name')}
 
         it "should return the last part of the urlname" do
-          page.slug.should == 'my-name'
+          expect(page.slug).to eq('my-name')
         end
       end
 
@@ -1415,7 +1630,7 @@ module Alchemy
         let(:page) { FactoryGirl.build(:page, urlname: nil)}
 
         it "should return nil" do
-          page.slug.should be_nil
+          expect(page.slug).to be_nil
         end
       end
     end
@@ -1453,32 +1668,32 @@ module Alchemy
 
       describe '#status' do
         it "returns a combined status hash" do
-          page.status.should == {public: true, visible: true, restricted: false, locked: false}
+          expect(page.status).to eq({public: true, visible: true, restricted: false, locked: false})
         end
       end
 
       describe '#status_title' do
         it "returns a translated status string for public status" do
-          page.status_title(:public).should == 'Page is published.'
+          expect(page.status_title(:public)).to eq('Page is published.')
         end
 
         it "returns a translated status string for visible status" do
-          page.status_title(:visible).should == 'Page is visible in navigation.'
+          expect(page.status_title(:visible)).to eq('Page is visible in navigation.')
         end
 
         it "returns a translated status string for locked status" do
-          page.status_title(:locked).should == ''
+          expect(page.status_title(:locked)).to eq('')
         end
 
         it "returns a translated status string for restricted status" do
-          page.status_title(:restricted).should == 'Page is not restricted.'
+          expect(page.status_title(:restricted)).to eq('Page is not restricted.')
         end
       end
     end
 
     context 'indicate page editors' do
       let(:page) { Page.new }
-      let(:user) { create(:editor_user) }
+      let(:user) { create(:alchemy_dummy_user, :as_editor) }
 
       describe '#creator' do
         before { page.update(creator_id: user.id) }
@@ -1486,21 +1701,81 @@ module Alchemy
         it "returns the user that created the page" do
           expect(page.creator).to eq(user)
         end
+
+        context 'with user class having a different primary key' do
+          before do
+            allow(Alchemy.user_class)
+              .to receive(:primary_key)
+              .and_return('user_id')
+
+            allow(page)
+              .to receive(:creator_id)
+              .and_return(1)
+          end
+
+          it "returns the user that created the page" do
+            expect(Alchemy.user_class)
+              .to receive(:find_by)
+              .with({'user_id' => 1})
+
+            page.creator
+          end
+        end
       end
 
       describe '#updater' do
         before { page.update(updater_id: user.id) }
 
-        it "returns the user that created the page" do
+        it "returns the user that updated the page" do
           expect(page.updater).to eq(user)
+        end
+
+        context 'with user class having a different primary key' do
+          before do
+            allow(Alchemy.user_class)
+              .to receive(:primary_key)
+              .and_return('user_id')
+
+            allow(page)
+              .to receive(:updater_id)
+              .and_return(1)
+          end
+
+          it "returns the user that updated the page" do
+            expect(Alchemy.user_class)
+              .to receive(:find_by)
+              .with({'user_id' => 1})
+
+            page.updater
+          end
         end
       end
 
       describe '#locker' do
         before { page.update(locked_by: user.id) }
 
-        it "returns the user that created the page" do
+        it "returns the user that locked the page" do
           expect(page.locker).to eq(user)
+        end
+
+        context 'with user class having a different primary key' do
+          before do
+            allow(Alchemy.user_class)
+              .to receive(:primary_key)
+              .and_return('user_id')
+
+            allow(page)
+              .to receive(:locked_by)
+              .and_return(1)
+          end
+
+          it "returns the user that locked the page" do
+            expect(Alchemy.user_class)
+              .to receive(:find_by)
+              .with({'user_id' => 1})
+
+            page.locker
+          end
         end
       end
 
@@ -1509,7 +1784,7 @@ module Alchemy
           %w(creator updater locker).each do |user_type|
             expect {
               page.send(user_type)
-            }.to_not raise_error(ActiveRecord::RecordNotFound)
+            }.to_not raise_error
           end
         end
       end
@@ -1518,7 +1793,7 @@ module Alchemy
         let(:user) { double(name: 'Paul Page') }
 
         describe '#creator_name' do
-          before { page.stub(:creator).and_return(user) }
+          before { allow(page).to receive(:creator).and_return(user) }
 
           it "returns the name of the creator" do
             expect(page.creator_name).to eq('Paul Page')
@@ -1526,7 +1801,7 @@ module Alchemy
         end
 
         describe '#updater_name' do
-          before { page.stub(:updater).and_return(user) }
+          before { allow(page).to receive(:updater).and_return(user) }
 
           it "returns the name of the updater" do
             expect(page.updater_name).to eq('Paul Page')
@@ -1534,7 +1809,7 @@ module Alchemy
         end
 
         describe '#locker_name' do
-          before { page.stub(:locker).and_return(user) }
+          before { allow(page).to receive(:locker).and_return(user) }
 
           it "returns the name of the current page editor" do
             expect(page.locker_name).to eq('Paul Page')
@@ -1546,7 +1821,7 @@ module Alchemy
         let(:user) { Alchemy.user_class.new }
 
         describe '#creator_name' do
-          before { page.stub(:creator).and_return(user) }
+          before { allow(page).to receive(:creator).and_return(user) }
 
           it "returns unknown" do
             expect(page.creator_name).to eq('unknown')
@@ -1554,7 +1829,7 @@ module Alchemy
         end
 
         describe '#updater_name' do
-          before { page.stub(:updater).and_return(user) }
+          before { allow(page).to receive(:updater).and_return(user) }
 
           it "returns unknown" do
             expect(page.updater_name).to eq('unknown')
@@ -1562,7 +1837,7 @@ module Alchemy
         end
 
         describe '#locker_name' do
-          before { page.stub(:locker).and_return(user) }
+          before { allow(page).to receive(:locker).and_return(user) }
 
           it "returns unknown" do
             expect(page.locker_name).to eq('unknown')
@@ -1576,8 +1851,8 @@ module Alchemy
 
       context 'if the page has a custom controller defined in its description' do
         before do
-          page.stub(:has_controller?).and_return(true)
-          page.stub(:layout_description).and_return({'controller' => 'comments', 'action' => 'index'})
+          allow(page).to receive(:has_controller?).and_return(true)
+          allow(page).to receive(:layout_description).and_return({'controller' => 'comments', 'action' => 'index'})
         end
         it "should return a Hash with controller and action key-value pairs" do
           expect(page.controller_and_action).to eq({controller: '/comments', action: 'index'})

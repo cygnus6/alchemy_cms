@@ -26,8 +26,11 @@ module Alchemy
     acts_as_essence ingredient_column: 'picture'
 
     belongs_to :picture
+    delegate :image_file_width, :image_file_height, :image_file, to: :picture
     before_save :fix_crop_values
     before_save :replace_newlines
+
+    include Alchemy::Picture::Transformations
 
     # The url to show the picture.
     #
@@ -70,14 +73,15 @@ module Alchemy
     #
     def cropping_mask
       return if crop_from.blank? || crop_size.blank?
-      crop_from = read_attribute(:crop_from).split('x')
-      crop_size = read_attribute(:crop_size).split('x')
-      {
-        x1: crop_from[0].to_i,
-        y1: crop_from[1].to_i,
-        x2: crop_from[0].to_i + crop_size[0].to_i,
-        y2: crop_from[1].to_i + crop_size[1].to_i
-      }
+      crop_from = point_from_string(read_attribute(:crop_from))
+      crop_size = sizes_from_string(read_attribute(:crop_size))
+
+      point_and_mask_to_points(crop_from, crop_size)
+    end
+
+    # Returns a serialized ingredient value for json api
+    def serialized_ingredient
+      picture_url(content.settings)
     end
 
     private

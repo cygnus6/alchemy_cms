@@ -1,40 +1,34 @@
-source 'http://rubygems.org'
+source 'https://rubygems.org'
 
 gemspec
 
-if ENV['RAILS_VERSION']
-  gem 'rails', ENV['RAILS_VERSION']
-end
-
-# Code coverage plattform
-gem 'coveralls', require: false
-
-# Fixes issues with wrong exit codes. See: https://github.com/colszowka/simplecov/issues/269
-gem 'simplecov', '0.7.1'
-
-gem 'database_cleaner'
-
-group :test do
-  gem 'sqlite3'               if ENV['DB'].nil? || ENV['DB'] == 'sqlite'
-  gem 'mysql2'                if ENV['DB'] == 'mysql'
-  gem 'pg'                    if ENV['DB'] == 'postgresql'
-  gem 'poltergeist'
-  unless ENV['CI']
-    gem 'launchy'
-  end
-end
+gem 'sqlite3' if ENV['DB'].nil? || ENV['DB'] == 'sqlite'
+gem 'mysql2'  if ENV['DB'] == 'mysql'
+gem 'pg'      if ENV['DB'] == 'postgresql'
 
 group :development, :test do
+  gem 'jasmine-rails',        github: 'searls/jasmine-rails'
+  gem 'jasmine-jquery-rails', github: 'travisjeffery/jasmine-jquery-rails'
+  if ENV['TRAVIS']
+    gem "codeclimate-test-reporter", require: false
+  else
+    gem 'simplecov',                 require: false
+  end
   unless ENV['CI']
+    gem 'launchy'
     gem 'annotate'
-    gem 'pry'
     gem 'bumpy'
     gem 'yard'
     gem 'redcarpet'
-    gem 'pry-rails'
-    gem 'spring', '~> 1.1.0.beta2'
+    gem 'pry-byebug'
+    gem 'spring'
     gem 'spring-commands-rspec'
+    gem 'rubocop', require: false
   end
-  gem 'jasmine-rails', github: 'searls/jasmine-rails'
-  gem 'jasmine-jquery-rails', github: 'travisjeffery/jasmine-jquery-rails'
+end
+
+# We need this if we want to start the dummy app in production, ie on Teatro.io
+group :production do
+  gem 'uglifier', '>= 1.0.3'
+  gem 'therubyracer'
 end
